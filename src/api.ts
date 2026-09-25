@@ -11,7 +11,7 @@ export function apiConfig(env: NodeJS.ProcessEnv = process.env) {
   return { key, base };
 }
 
-export async function request(path: string, init: { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown } = {}) {
+export async function request(path: string, init: { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown } = {}) {
   const { key, base } = apiConfig();
   const response = await fetch(`${base}${path}`, {
     method: init.method || 'GET',

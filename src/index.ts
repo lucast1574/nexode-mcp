@@ -8,7 +8,7 @@ import { apiConfig, request } from './api.js';
 try { apiConfig(); } catch (error) { console.error((error as Error).message); process.exit(1); }
 
 const server = new McpServer({ name: 'nexode', version: '0.1.0' });
-const output = async (path: string, method?: 'GET' | 'POST' | 'DELETE', body?: unknown) => {
+const output = async (path: string, method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown) => {
   try {
     const data = await request(path, { method, body });
     return { content: [{ type: 'text' as const, text: JSON.stringify(data) }] };
@@ -43,6 +43,14 @@ server.registerTool('nexode_compute_deploy_status', { description: 'Check the cu
 server.registerTool('nexode_compute_deployments', { description: 'List deployment history for a compute instance.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/deployments`));
 server.registerTool('nexode_compute_logs', { description: 'Read recent compute logs to diagnose a deployment.', inputSchema: { id, tail: z.number().int().min(1).max(2000).default(200) } }, async ({ id, tail }) => output(`/compute/${id}/logs?tail=${tail}`));
 server.registerTool('nexode_compute_redeploy', { description: 'Trigger a rebuild and redeployment of an existing compute instance.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/restart`, 'POST'));
+server.registerTool('nexode_compute_set_env', {
+  description: 'Merge environment variables into a compute instance without returning secret values. Requires compute:write. Redeploy after changing variables.',
+  inputSchema: { id, variables: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), z.string().max(8192)) },
+}, async ({ id, variables }) => output(`/compute/${id}/environment`, 'PUT', { variables }));
+server.registerTool('nexode_compute_link_database', {
+  description: 'Set a compute environment variable to a Nexode database connection URI without revealing the URI to the agent. Requires compute:write and databases:connect. Redeploy afterward.',
+  inputSchema: { id, database_id: id, variable_name: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).optional() },
+}, async ({ id, database_id, variable_name }) => output(`/compute/${id}/link-database`, 'POST', { database_id, variable_name }));
 server.registerTool('nexode_compute_add_domain', { description: 'Attach a domain to a compute instance.', inputSchema: { id, host: nonempty, port: z.number().int().positive().optional(), https: z.boolean().optional() } }, async ({ id, host, port, https }) => output(`/compute/${id}/domains`, 'POST', { host, port, https }));
 
 server.registerTool('nexode_database_list', { description: 'List database instances.' }, async () => output('/databases'));

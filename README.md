@@ -34,7 +34,7 @@ Configure a stdio server with command `npx`, arguments `--yes --package=github:l
 ## What it can do
 
 - Check identity, subscriptions, plan slugs and connected repositories.
-- Create and inspect frontend/backend compute instances; check deployment status, history and logs; redeploy and attach domains.
+- Create and inspect frontend/backend compute instances; check deployment status, history and logs; merge environment variables, link Nexode databases without disclosing their URIs, redeploy and attach domains.
 - Create/list databases and n8n; check domains; list and start Shield scans.
 
 Nexode provisions from a pushed Git repository. The local agent uses its own Git tooling to commit and push code; the Nexode API key does not grant GitHub or GitLab access. Compute read endpoints omit stored credentials and environment content. Provisioning still obeys plan slots and the backend's superadmin bypass.
