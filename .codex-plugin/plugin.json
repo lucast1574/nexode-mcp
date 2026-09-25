@@ -1,0 +1,17 @@
+{
+  "name": "nexode-mcp",
+  "version": "0.1.0",
+  "description": "Deploy and manage Nexode applications with an API key.",
+  "author": { "name": "Nexode" },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Nexode",
+    "shortDescription": "Deploy apps to Nexode",
+    "longDescription": "Connect an API key and deploy GitHub or GitLab apps to Nexode with MCP tools and a deployment skill.",
+    "developerName": "Nexode",
+    "category": "Developer Tools",
+    "capabilities": ["MCP", "deployment"],
+    "defaultPrompt": "Deploy this application to Nexode."
+  },
+  "mcpServers": "./.mcp.json"
+}
