@@ -1,6 +1,6 @@
 ---
 name: nexode-deploy
-description: Deploy an app from a local repository to Nexode, inspect deployments, and manage its compute, database, n8n, domain, or Shield resources through the Nexode MCP tools. Use when a user asks to publish, deploy, redeploy, or troubleshoot an app on Nexode.
+description: Deploy an app from a local repository to Nexode, inspect deployments, and manage its compute, database, n8n, domain, or Shield resources through the Nexode MCP tools. Use when a user asks to deploy an app or browse and edit a Nexode database.
 ---
 
 # Deploy on Nexode
@@ -14,3 +14,5 @@ Use the Nexode MCP tools. The MCP process reads `NEXODE_API_KEY` from the user's
 5. Poll `nexode_compute_deploy_status` and inspect `nexode_compute_deployments` or `nexode_compute_logs` if provisioning fails. Report the generated or custom URL when available. Do not claim the app is live from a successful create response alone.
 
 Compute read tools omit stored passwords and environment content. Use `nexode_compute_set_env` to merge runtime variables, then redeploy. For a Nexode database, prefer `nexode_compute_link_database` so its URI remains server-side; the key needs `compute:write` and `databases:connect`. Never print, log, or commit secrets. Domain purchases require a separate Stripe checkout in a browser.
+
+For database data, use `nexode_database_browse` to list tables or collections, then browse one in pages of 25. SQL rows appear as tables, MongoDB documents as JSON, and Redis as keys. To edit one value, pass the exact `primaryKey` fields from the browser result in `key` to `nexode_database_update_value`; MongoDB uses `_id`, Redis uses `key`. `nexode_database_delete_record` permanently removes one row/document/key. `nexode_database_delete_field` drops an SQL column from the entire table or unsets a MongoDB field in one document; include its `_id` in `key`. Confirm destructive targets and their impact with the user immediately before deleting. Do not use these tools on a different database than the one the user named.

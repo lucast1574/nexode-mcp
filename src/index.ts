@@ -7,7 +7,7 @@ import { apiConfig, request } from './api.js';
 // Fail at startup so clients can show a useful configuration error.
 try { apiConfig(); } catch (error) { console.error((error as Error).message); process.exit(1); }
 
-const server = new McpServer({ name: 'nexode', version: '0.1.2' });
+const server = new McpServer({ name: 'nexode', version: '0.1.3' });
 const output = async (path: string, method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown) => {
   try {
     const data = await request(path, { method, body });
@@ -62,6 +62,22 @@ server.registerTool('nexode_compute_add_domain', { description: 'Attach a domain
 
 server.registerTool('nexode_database_list', { description: 'List database instances.' }, async () => output('/databases'));
 server.registerTool('nexode_database_create', { description: 'Create a database in an available subscription slot.', inputSchema: { name: z.string().min(3), type: z.enum(['postgres', 'mongodb', 'redis', 'mysql']), plan_slug: nonempty } }, async (input) => output('/databases', 'POST', input));
+server.registerTool('nexode_database_browse', {
+  description: 'List tables/collections or view up to 25 rows/documents in one Nexode database. Redis shows keys. Only the database owned by this API key is accessible.',
+  inputSchema: { id, collection: z.string().optional(), offset: z.number().int().min(0).max(10000).default(0) },
+}, async ({ id, collection, offset }) => output(`/databases/${id}/browser?offset=${offset}${collection ? `&collection=${encode(collection)}` : ''}`));
+server.registerTool('nexode_database_update_value', {
+  description: 'Edit one SQL cell, one MongoDB document field, or one Redis string value. SQL rows need a primary key; use nexode_database_browse to get collection, key and field. This changes live data.',
+  inputSchema: { id, collection: nonempty, key: z.record(z.string(), z.any()), field: nonempty, value: z.any() },
+}, async ({ id, collection, key, field, value }) => output(`/databases/${id}/browser/value`, 'PUT', { collection, key, field, value }));
+server.registerTool('nexode_database_delete_record', {
+  description: 'Permanently delete one SQL row, MongoDB document, or Redis key identified by its primary key. Confirm the exact record with the user first.',
+  inputSchema: { id, collection: nonempty, key: z.record(z.string(), z.any()) },
+}, async ({ id, collection, key }) => output(`/databases/${id}/browser/delete-record`, 'POST', { collection, key }));
+server.registerTool('nexode_database_delete_field', {
+  description: 'Permanently drop a SQL column from the entire table or unset one MongoDB document field. Confirm the exact target and impact with the user first.',
+  inputSchema: { id, collection: nonempty, field: nonempty, key: z.record(z.string(), z.any()).optional() },
+}, async ({ id, collection, field, key }) => output(`/databases/${id}/browser/delete-field`, 'POST', { collection, field, key }));
 server.registerTool('nexode_database_delete', { description: 'Delete a database instance and its attached storage. This is irreversible.', inputSchema: { id } }, async ({ id }) => output(`/databases/${id}`, 'DELETE'));
 server.registerTool('nexode_n8n_list', { description: 'List n8n instances.' }, async () => output('/n8n'));
 server.registerTool('nexode_n8n_create', { description: 'Create an n8n instance in an available subscription slot. Set both username and password to protect the public endpoint with edge authentication.', inputSchema: { name: nonempty, plan_slug: nonempty, custom_domain: z.string().optional(), env_content: z.string().optional(), username: z.string().regex(/^[A-Za-z0-9._-]+$/).optional(), password: z.string().min(12).optional() } }, async (input) => output('/n8n', 'POST', input));

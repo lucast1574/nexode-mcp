@@ -36,6 +36,6 @@ Configure a stdio server with command `npx`, arguments `--yes --package=github:l
 - Check identity, subscriptions, plan slugs and connected repositories.
 - Create and inspect frontend/backend compute instances; check deployment status, history and logs; merge environment variables, link Nexode databases without disclosing their URIs, redeploy and attach domains.
 - Provision a private S3 bucket when creating a backend with `connect_storage: true`, or attach S3 to an existing backend with `nexode_compute_link_storage`. Nexode injects `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_FORCE_PATH_STYLE`; the MCP response never contains the secret. Redeploy an existing backend after linking.
-- Create/list databases and n8n; check domains; list and start Shield scans.
+- Create/list databases and n8n; browse SQL tables, MongoDB documents and Redis keys; edit individual values or delete records and fields with database-specific safeguards; check domains; list and start Shield scans.
 
 Nexode provisions from a pushed Git repository. The local agent uses its own Git tooling to commit and push code; the Nexode API key does not grant GitHub or GitLab access. Compute read endpoints omit stored credentials and environment content. Provisioning still obeys plan slots and the backend's superadmin bypass.
