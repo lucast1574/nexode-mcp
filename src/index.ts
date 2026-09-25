@@ -7,7 +7,7 @@ import { apiConfig, request } from './api.js';
 // Fail at startup so clients can show a useful configuration error.
 try { apiConfig(); } catch (error) { console.error((error as Error).message); process.exit(1); }
 
-const server = new McpServer({ name: 'nexode', version: '0.1.0' });
+const server = new McpServer({ name: 'nexode', version: '0.1.1' });
 const output = async (path: string, method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown) => {
   try {
     const data = await request(path, { method, body });
@@ -31,12 +31,12 @@ server.registerTool('nexode_repositories', {
 server.registerTool('nexode_compute_list', { description: 'List deployed frontend and backend compute instances.' }, async () => output('/compute'));
 server.registerTool('nexode_compute_get', { description: 'Get a compute instance and its operational status.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}`));
 server.registerTool('nexode_compute_create', {
-  description: 'Deploy a GitHub or GitLab repository as a frontend or backend. Requires an active plan with a free compute slot; plan_slug comes from nexode_plans. Repository must already exist and the Git provider must be connected.',
+  description: 'Deploy a GitHub or GitLab repository as a frontend or backend. Requires an active plan with a free compute slot; plan_slug comes from nexode_plans. Repository must already exist and the Git provider must be connected. For a backend that needs S3, set connect_storage=true to provision its private bucket and inject S3 variables before the first deployment (requires storage:connect).',
   inputSchema: {
     name: z.string().min(3).max(50), type: z.enum(['FRONTEND', 'BACKEND']), provider: z.enum(['GITHUB', 'GITLAB']),
     repository_url: z.string().url(), branch: nonempty.default('main'), plan_slug: nonempty,
     custom_domain: z.string().optional(), runtime: z.string().optional(), port: z.number().int().positive().optional(),
-    health_check_path: z.string().optional(), env_content: z.string().optional(),
+    health_check_path: z.string().optional(), env_content: z.string().optional(), connect_storage: z.boolean().optional(),
   },
 }, async (input) => output('/compute', 'POST', input));
 server.registerTool('nexode_compute_deploy_status', { description: 'Check the current deploy status for a compute instance.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/deploy-status`));
@@ -51,6 +51,13 @@ server.registerTool('nexode_compute_link_database', {
   description: 'Set a compute environment variable to a Nexode database connection URI without revealing the URI to the agent. Requires compute:write and databases:connect. Redeploy afterward.',
   inputSchema: { id, database_id: id, variable_name: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).optional() },
 }, async ({ id, database_id, variable_name }) => output(`/compute/${id}/link-database`, 'POST', { database_id, variable_name }));
+server.registerTool('nexode_storage_get', {
+  description: 'Inspect your Nexode S3 bucket, endpoint and plan quota without exposing credentials. Requires storage:read.',
+}, async () => output('/storage'));
+server.registerTool('nexode_compute_link_storage', {
+  description: 'Provision S3 if needed and inject a dedicated, bucket-scoped S3 access key into an existing backend compute. Secret remains server-side. Idempotent unless rotate=true. Requires compute:write and storage:connect. Redeploy if redeploy_required is true.',
+  inputSchema: { id, rotate: z.boolean().optional() },
+}, async ({ id, rotate }) => output(`/compute/${id}/link-storage`, 'POST', { rotate }));
 server.registerTool('nexode_compute_add_domain', { description: 'Attach a domain to a compute instance.', inputSchema: { id, host: nonempty, port: z.number().int().positive().optional(), https: z.boolean().optional() } }, async ({ id, host, port, https }) => output(`/compute/${id}/domains`, 'POST', { host, port, https }));
 
 server.registerTool('nexode_database_list', { description: 'List database instances.' }, async () => output('/databases'));

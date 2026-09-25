@@ -4,7 +4,7 @@ MCP tools and a shared skill for deploying GitHub/GitLab apps to [Nexode](https:
 
 ## Connect
 
-1. Create an API key in [Nexode API Keys](https://cloud.nexode.app/dashboard/api-keys). Give it `me:read`, `subscriptions:read`, `compute:read`, and `compute:write`. Add database, n8n, domain, or Shield scopes only for those workflows. Copy the key when it is shown; Nexode stores only its hash.
+1. Create an API key in [Nexode API Keys](https://cloud.nexode.app/dashboard/api-keys). Give it `me:read`, `subscriptions:read`, `compute:read`, and `compute:write`. For S3-backed apps, add `storage:read` and `storage:connect`. Add database, n8n, domain, or Shield scopes for those workflows. Copy the key when it is shown; Nexode stores only its hash.
 2. Set `NEXODE_API_KEY` in the environment that launches your agent. Keep it out of repositories and chat. On PowerShell for the current terminal: `$secret = Read-Host 'Nexode API key' -AsSecureString; $env:NEXODE_API_KEY = [System.Net.NetworkCredential]::new('', $secret).Password`. On Bash: `read -rs NEXODE_API_KEY && export NEXODE_API_KEY`.
 
 ### Claude Code
@@ -35,6 +35,7 @@ Configure a stdio server with command `npx`, arguments `--yes --package=github:l
 
 - Check identity, subscriptions, plan slugs and connected repositories.
 - Create and inspect frontend/backend compute instances; check deployment status, history and logs; merge environment variables, link Nexode databases without disclosing their URIs, redeploy and attach domains.
+- Provision a private S3 bucket when creating a backend with `connect_storage: true`, or attach S3 to an existing backend with `nexode_compute_link_storage`. Nexode injects `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_FORCE_PATH_STYLE`; the MCP response never contains the secret. Redeploy an existing backend after linking.
 - Create/list databases and n8n; check domains; list and start Shield scans.
 
 Nexode provisions from a pushed Git repository. The local agent uses its own Git tooling to commit and push code; the Nexode API key does not grant GitHub or GitLab access. Compute read endpoints omit stored credentials and environment content. Provisioning still obeys plan slots and the backend's superadmin bypass.
