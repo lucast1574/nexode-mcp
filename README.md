@@ -18,13 +18,14 @@ Restart Claude Code, then ask: “Use nexode-deploy to deploy this app.” The p
 
 ### Codex
 
-Install the skill from `skills/nexode-deploy` and register the MCP process:
+Install the plugin, which includes the skill and MCP tools:
 
 ```text
-codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp nexode-mcp
+codex plugin marketplace add lucast1574/nexode-mcp
+codex plugin add nexode-mcp@nexode
 ```
 
-The API key must be available to the Codex process as `NEXODE_API_KEY`. Codex plugin hosts that support local `.codex-plugin` packages can load this repo directly, including its `.mcp.json`.
+The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp nexode-mcp`.
 
 ### Other MCP clients
 
