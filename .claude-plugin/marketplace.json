@@ -1,5 +1,6 @@
 {
   "name": "nexode-mcp",
+  "description": "Nexode deployment tools for coding agents.",
   "owner": { "name": "Nexode" },
   "plugins": [
     { "name": "nexode-mcp", "source": "./", "description": "Deploy apps to Nexode with an API key." }
