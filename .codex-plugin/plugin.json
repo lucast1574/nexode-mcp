@@ -13,5 +13,12 @@
     "capabilities": ["MCP", "deployment"],
     "defaultPrompt": "Deploy this application to Nexode."
   },
-  "mcpServers": "./.mcp.json"
+  "mcpServers": {
+    "nexode": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["--yes", "--package=github:lucast1574/nexode-mcp", "nexode-mcp"],
+      "env_vars": ["NEXODE_API_KEY", "NEXODE_API_URL"]
+    }
+  }
 }
