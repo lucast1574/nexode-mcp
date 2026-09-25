@@ -4,7 +4,7 @@ MCP tools and a shared skill for deploying GitHub/GitLab apps to [Nexode](https:
 
 ## Connect
 
-1. Create an API key in [Nexode API Keys](https://cloud.nexode.app/dashboard/api-keys). Give it `me:read`, `subscriptions:read`, `compute:read`, and `compute:write`. For S3-backed apps, add `storage:read` and `storage:connect`. Add database, n8n, domain, or Shield scopes for those workflows. Copy the key when it is shown; Nexode stores only its hash.
+1. Create an API key in [Nexode API Keys](https://cloud.nexode.app/dashboard/api-keys). Full MCP access is selected automatically, including S3, databases, n8n, domains, and Shield. You can optionally customize permissions. Copy the key when it is shown; Nexode stores only its hash.
 2. Set `NEXODE_API_KEY` in the environment that launches your agent. Keep it out of repositories and chat. On PowerShell for the current terminal: `$secret = Read-Host 'Nexode API key' -AsSecureString; $env:NEXODE_API_KEY = [System.Net.NetworkCredential]::new('', $secret).Password`. On Bash: `read -rs NEXODE_API_KEY && export NEXODE_API_KEY`.
 
 ### Claude Code
