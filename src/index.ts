@@ -3,11 +3,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { apiConfig, request } from './api.js';
+import { deploymentInstructions, deploymentRequirements } from './deployment.js';
 
 // Fail at startup so clients can show a useful configuration error.
 try { apiConfig(); } catch (error) { console.error((error as Error).message); process.exit(1); }
 
-const server = new McpServer({ name: 'nexode', version: '0.1.4' });
+const server = new McpServer({ name: 'nexode', version: '0.1.5' }, { instructions: deploymentInstructions });
 const output = async (path: string, method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown) => {
   try {
     const data = await request(path, { method, body });
@@ -20,6 +21,11 @@ const id = z.string().regex(/^[a-f\d]{24}$/i, 'Expected a Nexode resource ID');
 const nonempty = z.string().min(1);
 const encode = (value: string) => encodeURIComponent(value);
 
+server.registerTool('nexode_deployment_requirements', {
+  description: 'First step for deploying local application code: get Nexode Dockerfile, host, port and Git preparation requirements. The coding agent then creates/adapts the Dockerfile for the actual stack, tests it, commits and pushes using its local tools before creating or redeploying compute. This tool returns requirements; it does not edit files or push Git itself.',
+  inputSchema: { type: z.enum(['FRONTEND', 'BACKEND']), port: z.number().int().min(1).max(65535).optional() },
+}, async ({ type, port }) => ({ content: [{ type: 'text' as const, text: JSON.stringify(deploymentRequirements(type, port)) }] }));
+
 server.registerTool('nexode_me', { description: 'Check Nexode API key, identity and scopes.' }, async () => output('/me'));
 server.registerTool('nexode_plans', { description: 'List current Nexode plan slugs, prices and resource slots.' }, async () => output('/subscriptions/plans'));
 server.registerTool('nexode_subscriptions', { description: 'List active subscriptions and included slots.' }, async () => output('/subscriptions'));
@@ -31,14 +37,14 @@ server.registerTool('nexode_repositories', {
 server.registerTool('nexode_compute_list', { description: 'List deployed frontend and backend compute instances.' }, async () => output('/compute'));
 server.registerTool('nexode_compute_get', { description: 'Get a compute instance and its operational status.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}`));
 server.registerTool('nexode_compute_create', {
-  description: 'Deploy a GitHub or GitLab repository as a frontend or backend. Nexode assigns the first free compute slot from active subscriptions. Repository must already exist and the Git provider must be connected. For a backend that needs S3, set connect_storage=true to provision its private bucket and inject S3 variables before the first deployment (requires storage:connect).',
+  description: 'Deploy a GitHub or GitLab repository as a frontend or backend. First use nexode_deployment_requirements, prepare and test a stack-compatible Dockerfile, commit/push it with local Git and verify the remote commit. Pass the same container port here (defaults: frontend 3000, backend 4000). Nexode assigns the first free compute slot. The Git provider must be connected. For a backend needing S3, set connect_storage=true to inject private S3 variables before the first deployment (requires storage:connect).',
   inputSchema: {
     name: z.string().min(3).max(50), type: z.enum(['FRONTEND', 'BACKEND']), provider: z.enum(['GITHUB', 'GITLAB']),
     repository_url: z.string().url(), branch: nonempty.default('main'),
-    custom_domain: z.string().optional(), runtime: z.string().optional(), port: z.number().int().positive().optional(),
+    custom_domain: z.string().optional(), runtime: z.string().optional(), port: z.number().int().min(1).max(65535).optional(),
     health_check_path: z.string().optional(), env_content: z.string().optional(), connect_storage: z.boolean().optional(),
   },
-}, async (input) => output('/compute', 'POST', input));
+}, async (input) => output('/compute', 'POST', { ...input, port: deploymentRequirements(input.type, input.port).container_port }));
 server.registerTool('nexode_compute_deploy_status', { description: 'Check the current deploy status for a compute instance.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/deploy-status`));
 server.registerTool('nexode_compute_deployments', { description: 'List deployment history for a compute instance.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/deployments`));
 server.registerTool('nexode_compute_diagnose', { description: 'Diagnose deployment, health endpoint, DNS and missing environment variables without returning secret values.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/diagnosis`));
@@ -53,7 +59,7 @@ server.registerTool('nexode_compute_create_preview', {
 }, async ({ id, branch, pull_request, ttl_hours, env_content }) => output(`/compute/${id}/previews`, 'POST', { branch, pull_request, ttl_hours, env_content }));
 server.registerTool('nexode_compute_delete_preview', { description: 'Delete a temporary preview and free its compute resources.', inputSchema: { id, preview_id: nonempty } }, async ({ id, preview_id }) => output(`/compute/${id}/previews/${encode(preview_id)}`, 'DELETE'));
 server.registerTool('nexode_compute_logs', { description: 'Read recent compute logs to diagnose a deployment.', inputSchema: { id, tail: z.number().int().min(1).max(2000).default(200) } }, async ({ id, tail }) => output(`/compute/${id}/logs?tail=${tail}`));
-server.registerTool('nexode_compute_redeploy', { description: 'Trigger a rebuild and redeployment of an existing compute instance.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/restart`, 'POST'));
+server.registerTool('nexode_compute_redeploy', { description: 'Trigger a rebuild and redeployment of an existing compute instance. For local code changes, first check deployment requirements, preserve the existing compute port, prepare/test its Dockerfile, commit/push and verify the remote SHA.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/restart`, 'POST'));
 server.registerTool('nexode_compute_set_env', {
   description: 'Merge environment variables into a compute instance without returning secret values. Requires compute:write. Redeploy after changing variables.',
   inputSchema: { id, variables: z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), z.string().max(8192)) },
