@@ -8,7 +8,7 @@ import { deploymentInstructions, deploymentRequirements } from './deployment.js'
 // Fail at startup so clients can show a useful configuration error.
 try { apiConfig(); } catch (error) { console.error((error as Error).message); process.exit(1); }
 
-const server = new McpServer({ name: 'nexode', version: '0.1.7' }, { instructions: deploymentInstructions });
+const server = new McpServer({ name: 'nexode', version: '0.1.8' }, { instructions: deploymentInstructions });
 const output = async (path: string, method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown) => {
   try {
     const data = await request(path, { method, body });
@@ -121,6 +121,19 @@ server.registerTool('nexode_n8n_create', { description: 'Create an n8n instance 
 server.registerTool('nexode_n8n_restart', { description: 'Redeploy an n8n instance and wait for it to become ready.', inputSchema: { id } }, async ({ id }) => output(`/n8n/${id}/restart`, 'POST'));
 server.registerTool('nexode_domain_check', { description: 'Check domain availability.', inputSchema: { domain: nonempty } }, async ({ domain }) => output(`/domains/check?domain=${encode(domain)}`));
 server.registerTool('nexode_domains', { description: 'List domains owned in Nexode.' }, async () => output('/domains'));
+server.registerTool('nexode_domain_get', {
+  description: 'Read one owned domain and its status. For an external domain pending verification, returns the exact DNS TXT challenge so setup can resume without re-adding the domain.',
+  inputSchema: { id },
+}, async ({ id }) => output(`/domains/${id}`));
+server.registerTool('nexode_domain_add_external', {
+  description: 'Add an already-owned domain bought at another registrar to Nexode. Requires domains:write. Returns pending_verification and the exact TXT record to create at the external DNS provider. This does not buy, transfer, activate the domain, change nameservers or configure routing. Use nexode_domains first to reuse an existing record.',
+  inputSchema: { domain: z.string().min(3).max(253) },
+}, async input => output('/domains/external', 'POST', input));
+server.registerTool('nexode_domain_verify_external', {
+  description: 'Check DNS TXT proof for an owned external domain after its returned verification record has been published. Requires domains:write. Only the backend can mark it active after the TXT matches; a missing/mismatched record or propagation delay remains pending. Routing to the app is a separate step.',
+  inputSchema: { id },
+}, async ({ id }) => output(`/domains/${id}/verify`, 'POST'));
+
 server.registerTool('nexode_shield_scans', { description: 'List recent Shield security scans.', inputSchema: { limit: z.number().int().min(1).max(200).default(20) } }, async ({ limit }) => output(`/shield/scans?limit=${limit}`));
 server.registerTool('nexode_shield_scan_compute', { description: 'Start a Shield scan for a compute instance.', inputSchema: { compute_instance_id: id } }, async ({ compute_instance_id }) => output('/shield/scan-compute', 'POST', { compute_instance_id }));
 

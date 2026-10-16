@@ -153,3 +153,25 @@ test('scope failures identify the permission without exposing the configured key
     assert.doesNotMatch(result.content[0].text, /ABCDEFGHIJKLMNOPQRSTUVWXYZ123456/);
   });
 });
+
+test('external domain tools resume TXT verification without purchase or DNS mutation', async () => {
+  const requests = [], id = 'aaaaaaaaaaaaaaaaaaaaaaaa'; let published = false;
+  const pending = { _id: id, domain: 'example.com.pe', source: 'external', status: 'pending_verification', verification: { type: 'TXT', name: '_nexode-verify.example.com.pe', value: 'nexode-verification=demo' } };
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const part of req) raw += part;
+    requests.push({ method: req.method, path: req.url, body: raw ? JSON.parse(raw) : null });
+    res.setHeader('Content-Type', 'application/json');
+    if (req.url.endsWith('/verify') && !published) { res.writeHead(400); res.end(JSON.stringify({ message: 'TXT record not found; DNS propagation pending' })); }
+    else res.end(JSON.stringify(req.url.endsWith('/verify') ? { ...pending, status: 'active', verification: null } : pending));
+  }, async client => {
+    const added = data(await client.callTool({ name: 'nexode_domain_add_external', arguments: { domain: 'example.com.pe' } }));
+    assert.deepEqual(added.verification, pending.verification); assert.equal(added.status, 'pending_verification');
+    assert.deepEqual(data(await client.callTool({ name: 'nexode_domain_get', arguments: { id } })), pending);
+    assert.equal((await client.callTool({ name: 'nexode_domain_verify_external', arguments: { id } })).isError, true);
+    published = true;
+    const verified = data(await client.callTool({ name: 'nexode_domain_verify_external', arguments: { id } }));
+    assert.equal(verified.status, 'active'); assert.equal(verified.verification, null);
+    assert.deepEqual(requests.map(r => [r.method, r.path]), [['POST', '/domains/external'], ['GET', `/domains/${id}`], ['POST', `/domains/${id}/verify`], ['POST', `/domains/${id}/verify`]]);
+    assert.deepEqual(requests[0].body, { domain: 'example.com.pe' });
+  });
+});
