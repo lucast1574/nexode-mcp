@@ -27,11 +27,11 @@ codex plugin marketplace add lucast1574/nexode-mcp
 codex plugin add nexode-mcp@nexode
 ```
 
-The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.8 nexode-mcp`.
+The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.9 nexode-mcp`.
 
 ### Other MCP clients
 
-Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.8 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
+Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.9 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
 
 ## What it can do
 
@@ -45,3 +45,9 @@ Configure a stdio server with command `npx`, arguments `--yes --package=github:l
 - Run and list database backups, verify a restore in a temporary database, or restore a selected copy after confirmation. Inspect deployment history and diagnosis, create password-protected branch/PR previews, and roll back to retained images. Check domains; list and start Shield scans.
 
 Nexode provisions from a pushed Git repository. Preparation happens before compute creation or a code redeploy. The MCP provides platform requirements; the coding agent uses its local file/shell tools to prepare the Dockerfile and its own Git tooling to commit and push code; the Nexode API key does not grant GitHub or GitLab access. Compute read endpoints omit stored credentials and environment content. Provisioning still obeys plan slots and the backend's superadmin bypass.
+
+### Reuse GitHub already authenticated on this PC
+
+With a valid Nexode API key and user authorization to connect their local GitHub, call `nexode_github_connect_local`. It reads `gh auth token --hostname github.com` internally, validates the credential with GitHub through Nexode and connects it to the API-key owner. No Nexode browser login or token argument is required. It refuses to overwrite a different connected GitHub account. If gh is missing or unauthenticated, run `gh auth login` on that PC; a Git SSH key alone cannot authorize GitHub API access. The credential is transmitted only to the official Nexode HTTPS API and is never included in MCP responses.
+
+For custom domains, configure apex and wildcard DNS when requested using the actual Nexode routing target, preserving mail/TXT and explicit host records. A wildcard DNS record does not attach hostnames to computes or issue wildcard TLS certificates. Each requested hostname still needs routing and HTTPS verification.

@@ -4,11 +4,12 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { apiConfig, request } from './api.js';
 import { deploymentInstructions, deploymentRequirements } from './deployment.js';
+import { connectLocalGithub } from './github.js';
 
 // Fail at startup so clients can show a useful configuration error.
 try { apiConfig(); } catch (error) { console.error((error as Error).message); process.exit(1); }
 
-const server = new McpServer({ name: 'nexode', version: '0.1.8' }, { instructions: deploymentInstructions });
+const server = new McpServer({ name: 'nexode', version: '0.1.9' }, { instructions: deploymentInstructions });
 const output = async (path: string, method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown) => {
   try {
     const data = await request(path, { method, body });
@@ -27,6 +28,12 @@ server.registerTool('nexode_deployment_requirements', {
 }, async ({ type, port }) => ({ content: [{ type: 'text' as const, text: JSON.stringify(deploymentRequirements(type, port)) }] }));
 
 server.registerTool('nexode_me', { description: 'Verify Nexode API-key access, identity and scopes. When this succeeds, operate directly through MCP; no dashboard or Google login is needed.' }, async () => output('/me'));
+server.registerTool('nexode_github_connect_local', {
+  description: 'Connect the GitHub CLI account already authenticated on this PC to the owner of NEXODE_API_KEY (requires compute:write). Reads gh auth token internally and transmits it only to the official Nexode HTTPS API for private repository deployments. Call when the user authorizes connecting their local GitHub; no token argument or browser login is needed. Refuses replacing a different connected GitHub identity. SSH-only Git authentication is insufficient.',
+}, async () => {
+  try { return { content: [{ type: 'text' as const, text: JSON.stringify(await connectLocalGithub()) }] }; }
+  catch (error) { return { content: [{ type: 'text' as const, text: (error as Error).message }], isError: true }; }
+});
 server.registerTool('nexode_plans', { description: 'List current Nexode plan slugs, prices and resource slots.' }, async () => output('/subscriptions/plans'));
 server.registerTool('nexode_subscriptions', { description: 'List active subscriptions and included slots.' }, async () => output('/subscriptions'));
 server.registerTool('nexode_repositories', {

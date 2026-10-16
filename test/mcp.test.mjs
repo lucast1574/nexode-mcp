@@ -32,7 +32,7 @@ test('MCP handshake, tools and scoped API errors', async () => {
     assert.ok(client.getInstructions()?.length);
     const { tools } = await client.listTools();
     const names = tools.map(tool => tool.name);
-    for (const name of ['nexode_apps', 'nexode_workspaces', 'nexode_app_create', 'nexode_app_update', 'nexode_app_connect', 'nexode_deployment_requirements', 'nexode_me', 'nexode_plans', 'nexode_repositories', 'nexode_compute_create', 'nexode_compute_deploy_status', 'nexode_compute_set_env', 'nexode_compute_link_database', 'nexode_storage_get', 'nexode_compute_link_storage', 'nexode_n8n_restart']) {
+    for (const name of ['nexode_apps', 'nexode_workspaces', 'nexode_app_create', 'nexode_app_update', 'nexode_app_connect', 'nexode_deployment_requirements', 'nexode_me', 'nexode_github_connect_local', 'nexode_plans', 'nexode_repositories', 'nexode_compute_create', 'nexode_compute_deploy_status', 'nexode_compute_set_env', 'nexode_compute_link_database', 'nexode_storage_get', 'nexode_compute_link_storage', 'nexode_n8n_restart']) {
       assert.ok(names.includes(name), `${name} missing`);
     }
     const result = await client.callTool({ name: 'nexode_me', arguments: {} });
@@ -173,5 +173,19 @@ test('external domain tools resume TXT verification without purchase or DNS muta
     assert.equal(verified.status, 'active'); assert.equal(verified.verification, null);
     assert.deepEqual(requests.map(r => [r.method, r.path]), [['POST', '/domains/external'], ['GET', `/domains/${id}`], ['POST', `/domains/${id}/verify`], ['POST', `/domains/${id}/verify`]]);
     assert.deepEqual(requests[0].body, { domain: 'example.com.pe' });
+  });
+});
+
+test('local GitHub tool accepts no credentials and refuses configurable API hosts', async () => {
+  let requests = 0;
+  await withMcp((_req, res) => { requests++; res.end('{}'); }, async client => {
+    const { tools } = await client.listTools();
+    const tool = tools.find(t => t.name === 'nexode_github_connect_local');
+    assert.ok(tool);
+    assert.ok(!tool.inputSchema?.properties?.token);
+    const result = await client.callTool({ name: tool.name, arguments: {} });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0].text, /official Nexode HTTPS/);
+    assert.equal(requests, 0);
   });
 });
