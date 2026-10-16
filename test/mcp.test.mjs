@@ -109,3 +109,47 @@ test('app/workspace tools and service creation keep explicit app assignments', a
     assert.equal(received[4].body.app_role, 'landing');
   });
 });
+
+test('a configured API key operates Nexode without a browser session or login requests', async () => {
+  const received = [];
+  await withMcp((req, res) => {
+    received.push({ path: req.url, authorization: req.headers.authorization, cookie: req.headers.cookie });
+    if (req.headers.authorization !== 'Bearer nxd_live_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456' || req.headers.cookie) {
+      res.writeHead(401); res.end('{"message":"API key required"}'); return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(req.url === '/me' ? { id: 'aaaaaaaaaaaaaaaaaaaaaaaa', scopes: ['*'] } : { data: [] }));
+  }, async client => {
+    for (const name of ['nexode_me', 'nexode_apps', 'nexode_compute_list', 'nexode_database_list', 'nexode_n8n_list']) {
+      assert.notEqual((await client.callTool({ name, arguments: {} })).isError, true, name);
+    }
+    assert.deepEqual(received.map(req => req.path), ['/me', '/apps', '/compute', '/databases', '/n8n']);
+    assert.ok(received.every(req => req.cookie === undefined));
+  });
+});
+
+test('API login redirects are rejected rather than followed', async () => {
+  const received = [];
+  await withMcp((req, res) => {
+    received.push(req.url);
+    if (req.url === '/me') { res.writeHead(302, { Location: '/auth/login' }); res.end(); }
+    else { res.writeHead(200); res.end('Login page'); }
+  }, async client => {
+    const result = await client.callTool({ name: 'nexode_me', arguments: {} });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0].text, /Nexode 302/);
+    assert.deepEqual(received, ['/me']);
+  });
+});
+
+test('scope failures identify the permission without exposing the configured key', async () => {
+  await withMcp((_req, res) => {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ message: 'API key missing required scope: compute:write' }));
+  }, async client => {
+    const result = await client.callTool({ name: 'nexode_compute_redeploy', arguments: { id: 'aaaaaaaaaaaaaaaaaaaaaaaa' } });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0].text, /compute:write/);
+    assert.doesNotMatch(result.content[0].text, /ABCDEFGHIJKLMNOPQRSTUVWXYZ123456/);
+  });
+});
