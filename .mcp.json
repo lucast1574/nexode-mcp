@@ -2,7 +2,7 @@
   "mcpServers": {
     "nexode": {
       "command": "npx",
-      "args": ["--yes", "--package=github:lucast1574/nexode-mcp#v0.1.10", "nexode-mcp"]
+      "args": ["--yes", "--package=github:lucast1574/nexode-mcp#v0.1.11", "nexode-mcp"]
     }
   }
 }
