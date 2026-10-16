@@ -9,7 +9,7 @@ import { connectLocalGithub } from './github.js';
 // Fail at startup so clients can show a useful configuration error.
 try { apiConfig(); } catch (error) { console.error((error as Error).message); process.exit(1); }
 
-const server = new McpServer({ name: 'nexode', version: '0.1.9' }, { instructions: deploymentInstructions });
+const server = new McpServer({ name: 'nexode', version: '0.1.10' }, { instructions: deploymentInstructions });
 const output = async (path: string, method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown) => {
   try {
     const data = await request(path, { method, body });
