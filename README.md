@@ -34,6 +34,7 @@ Configure a stdio server with command `npx`, arguments `--yes --package=github:l
 ## What it can do
 
 - Prepare local code before deployment: the coding agent detects the stack, creates/adapts a production Dockerfile, aligns the real HTTP listener with Nexode (frontend/landing 3000, backend 4000 by default), verifies the container where Docker is available, then commits and pushes using configured local Git. `nexode_deployment_requirements` supplies the same port contract to clients with or without the plugin skill.
+- Keep deployments visible in My Apps: select/create an app and workspace, pass `app_id` when creating services, and inspect the visual grouping and environment-derived connections without exposing values. One app per workspace, with three collaborators plus the owner in standard plans.
 - Check identity, subscriptions, available service slots and connected repositories.
 - Create and inspect frontend/backend compute instances; check deployment status, history and logs; merge environment variables, link Nexode databases without disclosing their URIs, redeploy and attach domains.
 - Provision a private S3 bucket when creating a backend with `connect_storage: true`, or attach S3 to an existing backend with `nexode_compute_link_storage`. Nexode injects `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_FORCE_PATH_STYLE`; the MCP response never contains the secret. Redeploy an existing backend after linking.

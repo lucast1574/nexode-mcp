@@ -32,7 +32,7 @@ test('MCP handshake, tools and scoped API errors', async () => {
     assert.ok(client.getInstructions()?.length);
     const { tools } = await client.listTools();
     const names = tools.map(tool => tool.name);
-    for (const name of ['nexode_deployment_requirements', 'nexode_me', 'nexode_plans', 'nexode_repositories', 'nexode_compute_create', 'nexode_compute_deploy_status', 'nexode_compute_set_env', 'nexode_compute_link_database', 'nexode_storage_get', 'nexode_compute_link_storage', 'nexode_n8n_restart']) {
+    for (const name of ['nexode_apps', 'nexode_workspaces', 'nexode_app_create', 'nexode_app_update', 'nexode_app_connect', 'nexode_deployment_requirements', 'nexode_me', 'nexode_plans', 'nexode_repositories', 'nexode_compute_create', 'nexode_compute_deploy_status', 'nexode_compute_set_env', 'nexode_compute_link_database', 'nexode_storage_get', 'nexode_compute_link_storage', 'nexode_n8n_restart']) {
       assert.ok(names.includes(name), `${name} missing`);
     }
     const result = await client.callTool({ name: 'nexode_me', arguments: {} });
@@ -82,5 +82,30 @@ test('compute creation forwards the exact prepared port including defaults', asy
     } });
     assert.equal(invalid.isError, true);
     assert.equal(received.length, 3);
+  });
+});
+
+
+test('app/workspace tools and service creation keep explicit app assignments', async () => {
+  const received = [];
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    received.push({ path: req.url, method: req.method, body: raw ? JSON.parse(raw) : null });
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ data: [] }));
+  }, async client => {
+    const app_id = 'aaaaaaaaaaaaaaaaaaaaaaaa', workspace_id = 'bbbbbbbbbbbbbbbbbbbbbbbb';
+    for (const [name, args] of [
+      ['nexode_apps', {}], ['nexode_workspaces', {}],
+      ['nexode_app_create', { name: 'Demo app', workspace_id }],
+      ['nexode_app_update', { id: app_id, workspace_id }],
+      ['nexode_compute_create', { name: 'Demo landing', type: 'FRONTEND', provider: 'GITHUB', repository_url: 'https://github.com/example/app', app_id, app_role: 'landing' }],
+      ['nexode_database_create', { name: 'Demo data', type: 'postgres', app_id }],
+      ['nexode_n8n_create', { name: 'Demo flows', app_id }],
+    ]) assert.notEqual((await client.callTool({ name, arguments: args })).isError, true);
+    assert.deepEqual(received.slice(0, 4).map(r => [r.method, r.path]), [['GET', '/apps'], ['GET', '/apps/workspaces'], ['POST', '/apps'], ['PUT', '/apps/' + app_id]]);
+    assert.deepEqual(received[2].body, { name: 'Demo app', workspace_id });
+    assert.deepEqual(received[3].body, { workspace_id });
+    assert.ok(received.slice(4).every(r => r.body.app_id === app_id));
+    assert.equal(received[4].body.app_role, 'landing');
   });
 });

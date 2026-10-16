@@ -8,7 +8,7 @@ import { deploymentInstructions, deploymentRequirements } from './deployment.js'
 // Fail at startup so clients can show a useful configuration error.
 try { apiConfig(); } catch (error) { console.error((error as Error).message); process.exit(1); }
 
-const server = new McpServer({ name: 'nexode', version: '0.1.5' }, { instructions: deploymentInstructions });
+const server = new McpServer({ name: 'nexode', version: '0.1.6' }, { instructions: deploymentInstructions });
 const output = async (path: string, method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown) => {
   try {
     const data = await request(path, { method, body });
@@ -34,13 +34,28 @@ server.registerTool('nexode_repositories', {
   inputSchema: { provider: z.enum(['github', 'gitlab']), organization: z.string().optional() },
 }, async ({ provider, organization }) => output(`/repositories/${provider}${organization ? `?${provider === 'github' ? 'org' : 'group'}=${encode(organization)}` : ''}`));
 
+server.registerTool('nexode_apps', { description: 'List visible apps, workspace/team assignments, all service cards and relationships detected from environment configuration. Secret values are never returned. Orphan services are automatically added to My Apps.', }, async () => output('/apps'));
+server.registerTool('nexode_workspaces', { description: 'List your owned and joined workspaces. Each workspace contains at most one app, with three collaborators plus the owner in standard plans.' }, async () => output('/apps/workspaces'));
+server.registerTool('nexode_app_create', {
+  description: 'Create a visual app in My Apps, using a free owned workspace or creating one within plan capacity. Choose this app before deploying its services. One app per workspace.',
+  inputSchema: { name: z.string().min(3).max(60), workspace_id: id.optional() },
+}, async input => output('/apps', 'POST', input));
+server.registerTool('nexode_app_update', {
+  description: 'Assign an app to a free owned workspace or update its visual service grouping. This only changes grouping: no environment writes or redeploys. Use nexode_apps to inspect manually configured relationships.',
+  inputSchema: { id, name: z.string().min(3).max(60).optional(), workspace_id: id.optional(), landing_id: id.nullable().optional(), frontend_id: id.nullable().optional(), backend_id: id.nullable().optional(), database_id: id.nullable().optional(), n8n_id: id.nullable().optional(), domain_id: id.nullable().optional(), use_storage: z.boolean().optional() },
+}, async ({ id, ...input }) => output(`/apps/${id}`, 'PUT', input));
+server.registerTool('nexode_app_connect', {
+  description: 'Explicitly wire the selected app services, inject database/S3 variables server-side, and redeploy affected computes. Requires apps:write, compute:write, databases:connect and storage:connect. Inspect grouping first; this changes live infrastructure.',
+  inputSchema: { id },
+}, async ({ id }) => output(`/apps/${id}/connect`, 'POST'));
+
 server.registerTool('nexode_compute_list', { description: 'List deployed frontend and backend compute instances.' }, async () => output('/compute'));
 server.registerTool('nexode_compute_get', { description: 'Get a compute instance and its operational status.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}`));
 server.registerTool('nexode_compute_create', {
   description: 'Deploy a GitHub or GitLab repository as a frontend or backend. First use nexode_deployment_requirements, prepare and test a stack-compatible Dockerfile, commit/push it with local Git and verify the remote commit. Pass the same container port here (defaults: frontend 3000, backend 4000). Nexode assigns the first free compute slot. The Git provider must be connected. For a backend needing S3, set connect_storage=true to inject private S3 variables before the first deployment (requires storage:connect).',
   inputSchema: {
     name: z.string().min(3).max(50), type: z.enum(['FRONTEND', 'BACKEND']), provider: z.enum(['GITHUB', 'GITLAB']),
-    repository_url: z.string().url(), branch: nonempty.default('main'),
+    repository_url: z.string().url(), branch: nonempty.default('main'), app_id: id.optional(), app_role: z.enum(['landing', 'frontend', 'backend']).optional(),
     custom_domain: z.string().optional(), runtime: z.string().optional(), port: z.number().int().min(1).max(65535).optional(),
     health_check_path: z.string().optional(), env_content: z.string().optional(), connect_storage: z.boolean().optional(),
   },
@@ -78,7 +93,7 @@ server.registerTool('nexode_compute_link_storage', {
 server.registerTool('nexode_compute_add_domain', { description: 'Attach a domain to a compute instance.', inputSchema: { id, host: nonempty, port: z.number().int().positive().optional(), https: z.boolean().optional() } }, async ({ id, host, port, https }) => output(`/compute/${id}/domains`, 'POST', { host, port, https }));
 
 server.registerTool('nexode_database_list', { description: 'List database instances.' }, async () => output('/databases'));
-server.registerTool('nexode_database_create', { description: 'Create a database in an available subscription slot, assigned automatically.', inputSchema: { name: z.string().min(3), type: z.enum(['postgres', 'mongodb', 'redis', 'mysql']) } }, async (input) => output('/databases', 'POST', input));
+server.registerTool('nexode_database_create', { description: 'Create a database in an available subscription slot, assigned automatically.', inputSchema: { name: z.string().min(3), type: z.enum(['postgres', 'mongodb', 'redis', 'mysql']), app_id: id.optional() } }, async (input) => output('/databases', 'POST', input));
 server.registerTool('nexode_database_backups', { description: 'List backup schedule, available restore points and last test restore for a database.', inputSchema: { id } }, async ({ id }) => output(`/databases/${id}/backups`));
 server.registerTool('nexode_database_enable_backups', { description: 'Enable daily backups with seven retained copies for a PostgreSQL, MySQL or MongoDB database.', inputSchema: { id } }, async ({ id }) => output(`/databases/${id}/backups/enable`, 'POST'));
 server.registerTool('nexode_database_backup_now', { description: 'Create a database backup now.', inputSchema: { id } }, async ({ id }) => output(`/databases/${id}/backups/run`, 'POST'));
@@ -102,7 +117,7 @@ server.registerTool('nexode_database_delete_field', {
 }, async ({ id, collection, field, key }) => output(`/databases/${id}/browser/delete-field`, 'POST', { collection, field, key }));
 server.registerTool('nexode_database_delete', { description: 'Delete a database instance and its attached storage. This is irreversible.', inputSchema: { id } }, async ({ id }) => output(`/databases/${id}`, 'DELETE'));
 server.registerTool('nexode_n8n_list', { description: 'List n8n instances.' }, async () => output('/n8n'));
-server.registerTool('nexode_n8n_create', { description: 'Create an n8n instance in an automatically assigned subscription slot. Set both username and password to protect the public endpoint with edge authentication.', inputSchema: { name: nonempty, custom_domain: z.string().optional(), env_content: z.string().optional(), username: z.string().regex(/^[A-Za-z0-9._-]+$/).optional(), password: z.string().min(12).optional() } }, async (input) => output('/n8n', 'POST', input));
+server.registerTool('nexode_n8n_create', { description: 'Create an n8n instance in an automatically assigned subscription slot. Set both username and password to protect the public endpoint with edge authentication.', inputSchema: { name: nonempty, app_id: id.optional(), custom_domain: z.string().optional(), env_content: z.string().optional(), username: z.string().regex(/^[A-Za-z0-9._-]+$/).optional(), password: z.string().min(12).optional() } }, async (input) => output('/n8n', 'POST', input));
 server.registerTool('nexode_n8n_restart', { description: 'Redeploy an n8n instance and wait for it to become ready.', inputSchema: { id } }, async ({ id }) => output(`/n8n/${id}/restart`, 'POST'));
 server.registerTool('nexode_domain_check', { description: 'Check domain availability.', inputSchema: { domain: nonempty } }, async ({ domain }) => output(`/domains/check?domain=${encode(domain)}`));
 server.registerTool('nexode_domains', { description: 'List domains owned in Nexode.' }, async () => output('/domains'));
