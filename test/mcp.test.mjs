@@ -29,6 +29,25 @@ async function withMcp(handler, run) {
 
 const data = result => JSON.parse(result.content[0].text);
 
+test('connect forwards actual stack variable names without accepting credentials', async () => {
+  const requests = [], id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    requests.push({ method: req.method, path: req.url, body: JSON.parse(raw) });
+    res.setHeader('Content-Type', 'application/json'); res.end('{"updated":[],"warnings":[]}');
+  }, async client => {
+    const variables = { frontend_api: 'BACKEND_URL', database: 'MONGODB_URI', backend_app: 'APP_URL',
+      backend_cors: 'CORS_ORIGIN', backend_landing: 'LANDING_URL', frontend_landing: 'PUBLIC_LANDING_URL', landing_app: 'PUBLIC_APP_URL' };
+    const result = await client.callTool({ name: 'nexode_app_connect', arguments: { id, variables } });
+    assert.notEqual(result.isError, true);
+    assert.deepEqual(requests, [{ method: 'POST', path: `/apps/${id}/connect`, body: { variables } }]);
+    for (const variables of [{ database: 'mongodb://password@host' }, { frontend_api: 'BAD-NAME' }, { secret: 'S3_SECRET_ACCESS_KEY' }]) {
+      assert.equal((await client.callTool({ name: 'nexode_app_connect', arguments: { id, variables } })).isError, true);
+    }
+    assert.equal(requests.length, 1);
+  });
+});
+
 test('first deploy defaults to the app name for landing, dashboard and API', async () => {
   const received = [], app_id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
   await withMcp(async (req, res) => {

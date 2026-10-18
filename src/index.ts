@@ -54,9 +54,17 @@ server.registerTool('nexode_app_update', {
   inputSchema: { id, name: z.string().min(3).max(60).optional(), workspace_id: id.optional(), landing_id: id.nullable().optional(), frontend_id: id.nullable().optional(), backend_id: id.nullable().optional(), database_id: id.nullable().optional(), n8n_id: id.nullable().optional(), domain_id: id.nullable().optional(), use_storage: z.boolean().optional() },
 }, async ({ id, ...input }) => output(`/apps/${id}`, 'PUT', input));
 server.registerTool('nexode_app_connect', {
-  description: 'Explicitly wire the selected app services, inject database/S3 variables server-side, and redeploy affected computes. Requires apps:write, compute:write, databases:connect and storage:connect. Inspect grouping first; this changes live infrastructure.',
-  inputSchema: { id },
-}, async ({ id }) => output(`/apps/${id}/connect`, 'POST'));
+  description: 'Wire owned app services and redeploy affected computes. Inspect the actual app configuration first and pass its variable NAMES in variables (not URLs or secrets): frontend_api, database, backend_app, backend_cors, backend_landing, frontend_landing, landing_app. Uses actual current service domains; persists names for future reconnects. Database/S3 credentials stay server-side, backend only. Existing unrelated CORS origins are retained. Legacy defaults without a mapping are NEXT_PUBLIC_API_URL and DATABASE_URL; do not assume your app reads them. Requires apps:write, compute:write, databases:connect and storage:connect. Third-party OAuth authorized domains and Stripe callbacks need separate provider configuration and login verification.',
+  inputSchema: { id, variables: z.object({
+    frontend_api: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,79}$/).optional(),
+    database: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,79}$/).optional(),
+    backend_app: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,79}$/).optional(),
+    backend_cors: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,79}$/).optional(),
+    backend_landing: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,79}$/).optional(),
+    frontend_landing: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,79}$/).optional(),
+    landing_app: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,79}$/).optional(),
+  }).strict().optional() },
+}, async ({ id, variables }) => output(`/apps/${id}/connect`, 'POST', variables ? { variables } : {}));
 
 server.registerTool('nexode_compute_list', { description: 'List deployed frontend and backend compute instances.' }, async () => output('/compute'));
 server.registerTool('nexode_compute_get', { description: 'Get a compute instance and its operational status.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}`));
