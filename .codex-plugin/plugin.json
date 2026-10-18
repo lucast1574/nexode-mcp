@@ -1,6 +1,6 @@
 {
   "name": "nexode-mcp",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Deploy and manage Nexode applications with an API key.",
   "author": { "name": "Nexode" },
   "skills": "./skills/",
@@ -17,7 +17,7 @@
     "nexode": {
       "type": "stdio",
       "command": "npx",
-      "args": ["--yes", "--package=github:lucast1574/nexode-mcp#v0.1.13", "nexode-mcp"],
+      "args": ["--yes", "--package=github:lucast1574/nexode-mcp#v0.1.14", "nexode-mcp"],
       "env_vars": ["NEXODE_API_KEY", "NEXODE_API_URL"]
     }
   }
