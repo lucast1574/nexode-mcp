@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 #!/usr/bin/env node
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -10,7 +11,7 @@ import { projectSubdomain } from './naming.js';
 // Fail at startup so clients can show a useful configuration error.
 try { apiConfig(); } catch (error) { console.error((error as Error).message); process.exit(1); }
 
-const server = new McpServer({ name: 'nexode', version: '0.1.13' }, { instructions: deploymentInstructions });
+const server = new McpServer({ name: 'nexode', version: JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version }, { instructions: deploymentInstructions });
 const output = async (path: string, method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown) => {
   try {
     const data = await request(path, { method, body });

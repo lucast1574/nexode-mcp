@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -17,6 +18,7 @@ async function withMcp(handler, run) {
   });
   try {
     await client.connect(transport);
+    assert.equal(client.getServerVersion()?.version, JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
     await run(client);
   } finally {
     await client.close();
