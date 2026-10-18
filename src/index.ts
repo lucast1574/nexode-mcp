@@ -5,11 +5,12 @@ import { z } from 'zod';
 import { apiConfig, request } from './api.js';
 import { deploymentInstructions, deploymentRequirements } from './deployment.js';
 import { connectLocalGithub } from './github.js';
+import { projectSubdomain } from './naming.js';
 
 // Fail at startup so clients can show a useful configuration error.
 try { apiConfig(); } catch (error) { console.error((error as Error).message); process.exit(1); }
 
-const server = new McpServer({ name: 'nexode', version: '0.1.11' }, { instructions: deploymentInstructions });
+const server = new McpServer({ name: 'nexode', version: '0.1.12' }, { instructions: deploymentInstructions });
 const output = async (path: string, method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown) => {
   try {
     const data = await request(path, { method, body });
@@ -58,15 +59,32 @@ server.registerTool('nexode_app_connect', {
 
 server.registerTool('nexode_compute_list', { description: 'List deployed frontend and backend compute instances.' }, async () => output('/compute'));
 server.registerTool('nexode_compute_get', { description: 'Get a compute instance and its operational status.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}`));
+server.registerTool('nexode_compute_rename_subdomain', {
+  description: 'Rename the generated Nexode hostname of an existing running compute. Convention: landing sheeplink.nexode.app, frontend panel.sheeplink.nexode.app, backend api.sheeplink.nexode.app. Identify actual roles with nexode_apps and compute_list/get. Pass sheeplink, panel.sheeplink or api.sheeplink, not a URL/full hostname. Assign the base landing first; nested names require the same owner. Requires compute:write. Rejects occupied/reserved names and instances using custom domains. Preserves port, HTTPS settings, repo and infrastructure without rebuild. Old URL has no redirect. Verify every returned HTTPS URL before claiming success; nested names require matching DNS and certificates. Do not rewrite environment URLs automatically.',
+  inputSchema: { id, subdomain: z.string().trim().toLowerCase().regex(/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)?$/, 'Pass sheeplink, panel.sheeplink or api.sheeplink') },
+}, async ({ id, subdomain }) => output(`/compute/${id}/subdomain`, 'PUT', { subdomain }));
 server.registerTool('nexode_compute_create', {
-  description: 'Deploy a GitHub or GitLab repository as a frontend or backend. First use nexode_deployment_requirements, prepare and test a stack-compatible Dockerfile, commit/push it with local Git and verify the remote commit. Pass the same container port here (defaults: frontend 3000, backend 4000). Nexode assigns the first free compute slot. The Git provider must be connected. For a backend needing S3, set connect_storage=true to inject private S3 variables before the first deployment (requires storage:connect).',
+  description: 'Deploy a GitHub/GitLab repo. First ask the user what the project is called (unless already stated), select/create its app using that name, and pass app_id. Default public names use the app name: landing <project>.nexode.app, frontend panel.<project>.nexode.app, backend api.<project>.nexode.app. Set app_role=landing for the commercial landing. Existing app namespaces are reused; subdomain overrides the default. Occupied names return an error; ask for another base rather than appending random repo suffixes. An explicit custom_domain takes precedence. First prepare/test the Dockerfile, commit/push and verify the remote SHA. Pass the actual container port (frontend 3000/backend 4000 defaults). Git provider must be connected. connect_storage=true injects private S3 variables for backends (storage:connect).',
   inputSchema: {
     name: z.string().min(3).max(50), type: z.enum(['FRONTEND', 'BACKEND']), provider: z.enum(['GITHUB', 'GITLAB']),
-    repository_url: z.string().url(), branch: nonempty.default('main'), app_id: id.optional(), app_role: z.enum(['landing', 'frontend', 'backend']).optional(),
+    repository_url: z.string().url(), branch: nonempty.default('main'), app_id: id, app_role: z.enum(['landing', 'frontend', 'backend']).optional(),
+    subdomain: z.string().trim().toLowerCase().regex(/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)?$/).optional(),
     custom_domain: z.string().optional(), runtime: z.string().optional(), port: z.number().int().min(1).max(65535).optional(),
     health_check_path: z.string().optional(), env_content: z.string().optional(), connect_storage: z.boolean().optional(),
   },
-}, async (input) => output('/compute', 'POST', { ...input, port: deploymentRequirements(input.type, input.port).container_port }));
+}, async (input) => {
+  try {
+    const role = input.app_role || (input.type === 'BACKEND' ? 'backend' : 'frontend');
+    let subdomain = input.subdomain;
+    if (!input.custom_domain && !subdomain) {
+      const app = await request(`/apps/${input.app_id}`) as { name?: string; subdomain_base?: string };
+      subdomain = projectSubdomain(app, role);
+    }
+    return await output('/compute', 'POST', { ...input, app_role: role, ...(subdomain ? { subdomain } : {}), port: deploymentRequirements(input.type, input.port).container_port });
+  } catch (error) {
+    return { content: [{ type: 'text' as const, text: (error as Error).message }], isError: true };
+  }
+});
 server.registerTool('nexode_compute_deploy_status', { description: 'Check the current deploy status for a compute instance.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/deploy-status`));
 server.registerTool('nexode_compute_deployments', { description: 'List deployment history for a compute instance.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/deployments`));
 server.registerTool('nexode_compute_diagnose', { description: 'Diagnose deployment, health endpoint, DNS and missing environment variables without returning secret values.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/diagnosis`));
@@ -98,6 +116,7 @@ server.registerTool('nexode_compute_link_storage', {
   inputSchema: { id, rotate: z.boolean().optional() },
 }, async ({ id, rotate }) => output(`/compute/${id}/link-storage`, 'POST', { rotate }));
 server.registerTool('nexode_compute_add_domain', { description: 'Attach a domain to a compute instance.', inputSchema: { id, host: nonempty, port: z.number().int().positive().optional(), https: z.boolean().optional() } }, async ({ id, host, port, https }) => output(`/compute/${id}/domains`, 'POST', { host, port, https }));
+server.registerTool('nexode_compute_domains', { description: 'Inspect the current routing hostnames and HTTPS settings of an owned compute. Use to verify or reconcile a subdomain rename; still test public DNS and HTTPS separately.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/domains`));
 
 server.registerTool('nexode_database_list', { description: 'List database instances.' }, async () => output('/databases'));
 server.registerTool('nexode_database_create', { description: 'Create a database in an available subscription slot, assigned automatically.', inputSchema: { name: z.string().min(3), type: z.enum(['postgres', 'mongodb', 'redis', 'mysql']), app_id: id.optional() } }, async (input) => output('/databases', 'POST', input));

@@ -27,13 +27,16 @@ codex plugin marketplace add lucast1574/nexode-mcp
 codex plugin add nexode-mcp@nexode
 ```
 
-The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.11 nexode-mcp`.
+The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.12 nexode-mcp`.
 
 ### Other MCP clients
 
-Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.11 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
+Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.12 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
 
 ## What it can do
+
+- Ask for the project name before its first deploy and use it for clean default URLs: `sheeplink.nexode.app` (landing), `panel.sheeplink.nexode.app` (frontend), and `api.sheeplink.nexode.app` (backend). Compute creation requires `app_id`; the tool derives the name from the selected app and reuses its reserved namespace. Custom domains take precedence. Occupied/reserved names produce an error instead of random suffixes.
+- Repair older generated URLs with `nexode_compute_rename_subdomain` (`id`, `subdomain: "sheeplink"`, `"panel.sheeplink"`, or `"api.sheeplink"`; `compute:write`). Routes and stored public URLs change together without rebuilding or changing port/HTTPS settings. Old URLs have no redirect. Existing deployments stay unchanged until a migration is requested. Verify DNS, HTTPS certificates, and dependent API/CORS/auth/webhook URLs; route updates alone do not repair application configuration.
 
 - Prepare local code before deployment: the coding agent detects the stack, creates/adapts a production Dockerfile, aligns the real HTTP listener with Nexode (frontend/landing 3000, backend 4000 by default), verifies the container where Docker is available, then commits and pushes using configured local Git. `nexode_deployment_requirements` supplies the same port contract to clients with or without the plugin skill.
 - Keep deployments visible in My Apps: select/create an app and workspace, pass `app_id` when creating services, and inspect the visual grouping and environment-derived connections without exposing values. One app per workspace, with three collaborators plus the owner in standard plans.

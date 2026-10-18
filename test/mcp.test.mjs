@@ -27,6 +27,58 @@ async function withMcp(handler, run) {
 
 const data = result => JSON.parse(result.content[0].text);
 
+test('first deploy defaults to the app name for landing, panel and API', async () => {
+  const received = [], app_id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    received.push({ path: req.url, method: req.method, body: raw ? JSON.parse(raw) : null });
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(req.method === 'GET' ? { name: 'Sheeplink' } : { generated_domain: JSON.parse(raw).subdomain + '.nexode.app' }));
+  }, async client => {
+    for (const [app_role, type, expected] of [['landing', 'FRONTEND', 'sheeplink'], ['frontend', 'FRONTEND', 'panel.sheeplink'], ['backend', 'BACKEND', 'api.sheeplink']]) {
+      const result = await client.callTool({ name: 'nexode_compute_create', arguments: {
+        name: 'ugly-repo-random123', app_id, app_role, type, provider: 'GITHUB', repository_url: 'https://github.com/example/repo',
+      } });
+      assert.notEqual(result.isError, true);
+      assert.equal(received.at(-1).body.subdomain, expected);
+      assert.equal(data(result).generated_domain, expected + '.nexode.app');
+    }
+    assert.equal(received.filter(r => r.method === 'GET').length, 3);
+    const result = await client.callTool({ name: 'nexode_compute_create', arguments: {
+      name: 'custom', app_id, type: 'FRONTEND', provider: 'GITHUB', repository_url: 'https://github.com/example/repo', custom_domain: 'www.example.org',
+    } });
+    assert.notEqual(result.isError, true);
+    assert.equal(received.filter(r => r.method === 'GET').length, 3);
+    assert.equal(received.at(-1).body.subdomain, undefined);
+  });
+});
+
+test('rename supports nested platform names and reports collision errors without fallback', async () => {
+  const received = [], id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    received.push({ path: req.url, method: req.method, body: JSON.parse(raw) });
+    res.setHeader('Content-Type', 'application/json');
+    if (JSON.parse(raw).subdomain === 'taken') { res.writeHead(400); res.end('{"message":"This subdomain is already in use."}'); }
+    else res.end(JSON.stringify({ url: 'https://' + JSON.parse(raw).subdomain + '.nexode.app', https_status: 'pending_verification' }));
+  }, async client => {
+    for (const subdomain of ['sheeplink', 'panel.sheeplink', 'api.sheeplink']) {
+      const result = await client.callTool({ name: 'nexode_compute_rename_subdomain', arguments: { id, subdomain } });
+      assert.notEqual(result.isError, true);
+      assert.equal(data(result).url, 'https://' + subdomain + '.nexode.app');
+      assert.deepEqual(received.at(-1), { path: '/compute/' + id + '/subdomain', method: 'PUT', body: { subdomain } });
+    }
+    for (const subdomain of ['https://bad.nexode.app', 'a.b.c', '-bad', 'a'.repeat(64)]) {
+      assert.equal((await client.callTool({ name: 'nexode_compute_rename_subdomain', arguments: { id, subdomain } })).isError, true);
+    }
+    assert.equal(received.length, 3);
+    const conflict = await client.callTool({ name: 'nexode_compute_rename_subdomain', arguments: { id, subdomain: 'taken' } });
+    assert.equal(conflict.isError, true); assert.match(conflict.content[0].text, /already in use/);
+    assert.equal(received.length, 4);
+    assert.match(client.getInstructions(), /ask the user what the project is called/i);
+  });
+});
+
 test('MCP handshake, tools and scoped API errors', async () => {
   await withMcp((_req, res) => { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ message: 'Invalid API key' })); }, async client => {
     assert.ok(client.getInstructions()?.length);
@@ -71,7 +123,7 @@ test('compute creation forwards the exact prepared port including defaults', asy
   }, async client => {
     for (const [type, port] of [['FRONTEND', undefined], ['BACKEND', undefined], ['FRONTEND', 8080]]) {
       const result = await client.callTool({ name: 'nexode_compute_create', arguments: {
-        name: 'test-app', type, provider: 'GITHUB', repository_url: 'https://github.com/example/app', ...(port ? { port } : {}),
+        name: 'test-app', type, provider: 'GITHUB', repository_url: 'https://github.com/example/app', app_id: 'aaaaaaaaaaaaaaaaaaaaaaaa', subdomain: 'test-app', ...(port ? { port } : {}),
       } });
       assert.notEqual(result.isError, true);
     }
@@ -98,7 +150,7 @@ test('app/workspace tools and service creation keep explicit app assignments', a
       ['nexode_apps', {}], ['nexode_workspaces', {}],
       ['nexode_app_create', { name: 'Demo app', workspace_id }],
       ['nexode_app_update', { id: app_id, workspace_id }],
-      ['nexode_compute_create', { name: 'Demo landing', type: 'FRONTEND', provider: 'GITHUB', repository_url: 'https://github.com/example/app', app_id, app_role: 'landing' }],
+      ['nexode_compute_create', { name: 'Demo landing', type: 'FRONTEND', provider: 'GITHUB', repository_url: 'https://github.com/example/app', app_id, app_role: 'landing', subdomain: 'demo' }],
       ['nexode_database_create', { name: 'Demo data', type: 'postgres', app_id }],
       ['nexode_n8n_create', { name: 'Demo flows', app_id }],
     ]) assert.notEqual((await client.callTool({ name, arguments: args })).isError, true);
