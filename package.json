@@ -1,6 +1,6 @@
 {
   "name": "nexode-mcp",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": false,
   "type": "module",
   "description": "MCP tools for deploying apps on Nexode",

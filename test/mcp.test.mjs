@@ -27,7 +27,7 @@ async function withMcp(handler, run) {
 
 const data = result => JSON.parse(result.content[0].text);
 
-test('first deploy defaults to the app name for landing, panel and API', async () => {
+test('first deploy defaults to the app name for landing, dashboard and API', async () => {
   const received = [], app_id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
   await withMcp(async (req, res) => {
     let raw = ''; for await (const chunk of req) raw += chunk;
@@ -35,7 +35,7 @@ test('first deploy defaults to the app name for landing, panel and API', async (
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(req.method === 'GET' ? { name: 'Sheeplink' } : { generated_domain: JSON.parse(raw).subdomain + '.nexode.app' }));
   }, async client => {
-    for (const [app_role, type, expected] of [['landing', 'FRONTEND', 'sheeplink'], ['frontend', 'FRONTEND', 'panel.sheeplink'], ['backend', 'BACKEND', 'api.sheeplink']]) {
+    for (const [app_role, type, expected] of [['landing', 'FRONTEND', 'sheeplink'], ['frontend', 'FRONTEND', 'dashboard.sheeplink'], ['backend', 'BACKEND', 'api.sheeplink']]) {
       const result = await client.callTool({ name: 'nexode_compute_create', arguments: {
         name: 'ugly-repo-random123', app_id, app_role, type, provider: 'GITHUB', repository_url: 'https://github.com/example/repo',
       } });
@@ -62,7 +62,7 @@ test('rename supports nested platform names and reports collision errors without
     if (JSON.parse(raw).subdomain === 'taken') { res.writeHead(400); res.end('{"message":"This subdomain is already in use."}'); }
     else res.end(JSON.stringify({ url: 'https://' + JSON.parse(raw).subdomain + '.nexode.app', https_status: 'pending_verification' }));
   }, async client => {
-    for (const subdomain of ['sheeplink', 'panel.sheeplink', 'api.sheeplink']) {
+    for (const subdomain of ['sheeplink', 'dashboard.sheeplink', 'api.sheeplink']) {
       const result = await client.callTool({ name: 'nexode_compute_rename_subdomain', arguments: { id, subdomain } });
       assert.notEqual(result.isError, true);
       assert.equal(data(result).url, 'https://' + subdomain + '.nexode.app');

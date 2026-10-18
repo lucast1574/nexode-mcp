@@ -6,5 +6,5 @@ export function projectSubdomain(app: { name?: string; subdomain_base?: string }
   if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(base)) {
     throw new Error('Choose a project name that can form a DNS label or pass an explicit subdomain.');
   }
-  return `${role === 'landing' ? '' : role === 'frontend' ? 'panel.' : 'api.'}${base}`;
+  return `${role === 'landing' ? '' : role === 'frontend' ? 'dashboard.' : 'api.'}${base}`;
 }
