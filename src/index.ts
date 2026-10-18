@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
