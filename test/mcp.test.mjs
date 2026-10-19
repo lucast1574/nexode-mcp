@@ -270,3 +270,30 @@ test('selected environment keys can be removed without passing credential values
   assert.notEqual(result.isError,true);assert.deepEqual(received,{method:'DELETE',path:'/compute/'+id+'/environment',body:{keys:['SUPERADMIN_EMAIL','SUPERADMIN_PASSWORD']}});
  });
 });
+
+
+test('purchased domain checkout and DNS inspection preserve backend states', async () => {
+  const received = [], id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    received.push({ path: req.url, method: req.method, body: raw ? JSON.parse(raw) : null });
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(req.url.endsWith('/register')
+      ? { domain: { _id: id, status: 'pending_payment' }, checkout_url: 'https://checkout.stripe.com/test' }
+      : req.url.endsWith('/dns') ? { data: [{ type: 'ALIAS', content: 'nodes.nexode.app' }] }
+      : { _id: id, status: 'active', dns_status: 'pending' }));
+  }, async client => {
+    const checkout = await client.callTool({ name: 'nexode_domain_register', arguments: { domain: 'example.org' } });
+    assert.equal(data(checkout).domain.status, 'pending_payment');
+    assert.equal(data(checkout).checkout_url, 'https://checkout.stripe.com/test');
+    assert.equal(data(await client.callTool({ name: 'nexode_domain_get', arguments: { id } })).dns_status, 'pending');
+    assert.equal(data(await client.callTool({ name: 'nexode_domain_dns', arguments: { id } })).data[0].type, 'ALIAS');
+    assert.deepEqual(received, [
+      { path: '/domains/register', method: 'POST', body: { domain: 'example.org' } },
+      { path: '/domains/' + id, method: 'GET', body: null },
+      { path: '/domains/' + id + '/dns', method: 'GET', body: null },
+    ]);
+    assert.match(client.getInstructions(), /dns_status=ready/);
+    assert.match(client.getInstructions(), /Never use the worker's private LAN IP/);
+  });
+});

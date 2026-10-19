@@ -160,6 +160,14 @@ server.registerTool('nexode_n8n_create', { description: 'Create an n8n instance 
 server.registerTool('nexode_n8n_restart', { description: 'Redeploy an n8n instance and wait for it to become ready.', inputSchema: { id } }, async ({ id }) => output(`/n8n/${id}/restart`, 'POST'));
 server.registerTool('nexode_domain_check', { description: 'Check domain availability.', inputSchema: { domain: nonempty } }, async ({ domain }) => output(`/domains/check?domain=${encode(domain)}`));
 server.registerTool('nexode_domains', { description: 'List domains owned in Nexode.' }, async () => output('/domains'));
+server.registerTool('nexode_domain_register', {
+  description: 'Begin purchase of the exact domain requested by the user. Requires domains:write. Returns a Stripe checkout URL; the user completes payment. Reuse existing pending purchases instead of registering again. After payment Nexode automatically registers and configures apex/wildcard DNS. Poll nexode_domain_get until active and dns_status=ready, then attach the requested hostnames to the intended compute and verify HTTPS.',
+  inputSchema: { domain: z.string().min(3).max(253) },
+}, async input => output('/domains/register', 'POST', input));
+server.registerTool('nexode_domain_dns', {
+  description: 'Inspect DNS records for an owned domain registered through Nexode. Requires domains:read. External domains use their existing DNS provider. DNS readiness does not attach a hostname to a compute or guarantee HTTPS.',
+  inputSchema: { id },
+}, async ({ id }) => output(`/domains/${id}/dns`));
 server.registerTool('nexode_domain_get', {
   description: 'Read one owned domain and its status. For an external domain pending verification, returns the exact DNS TXT challenge so setup can resume without re-adding the domain.',
   inputSchema: { id },
