@@ -297,3 +297,39 @@ test('purchased domain checkout and DNS inspection preserve backend states', asy
     assert.match(client.getInstructions(), /Never use the worker's private LAN IP/);
   });
 });
+
+test('analytics tools return the real installation snippet and toggle without leaking keys', async () => {
+  const received = [], id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    received.push({ method: req.method, path: req.url, body: raw ? JSON.parse(raw) : null });
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(req.method === 'GET' ? { enabled: false, script: `<script src="https://backend.nexode.app/api-v1/analytics/script.js" data-site="${id}"></script>` } : { enabled: JSON.parse(raw).enabled }));
+  }, async client => {
+    assert.match(client.getInstructions(), /include automatic Nexode web analytics setup/);
+    const tools = await client.listTools();
+    assert.ok(tools.tools.some(t => t.name === 'nexode_compute_analytics'));
+    assert.ok(tools.tools.some(t => t.name === 'nexode_compute_configure_analytics'));
+    for (const days of [undefined, 1, 30]) {
+      const result = await client.callTool({ name: 'nexode_compute_analytics', arguments: { id, ...(days ? { days } : {}) } });
+      assert.notEqual(result.isError, true);
+      assert.match(data(result).script, new RegExp(`data-site="${id}"`));
+      assert.equal(received.at(-1).path, `/compute/${id}/analytics?days=${days || 7}`);
+    }
+    for (const enabled of [true, false]) {
+      const result = await client.callTool({ name: 'nexode_compute_configure_analytics', arguments: { id, enabled } });
+      assert.deepEqual(data(result), { enabled });
+      assert.deepEqual(received.at(-1), { method: 'PUT', path: `/compute/${id}/analytics`, body: { enabled } });
+    }
+    for (const args of [{ id, days: 365 }, { id: '../bad' }]) {
+      assert.equal((await client.callTool({ name: 'nexode_compute_analytics', arguments: args })).isError, true);
+    }
+    assert.equal((await client.callTool({ name: 'nexode_compute_configure_analytics', arguments: { id, enabled: 'false' } })).isError, true);
+    assert.equal(received.length, 5);
+    assert.ok(!JSON.stringify(received).includes('nxd_live_'));
+    const frontend = data(await client.callTool({ name: 'nexode_deployment_requirements', arguments: { type: 'FRONTEND' } }));
+    assert.match(frontend.web_analytics, /nexode_compute_analytics/);
+    const backend = data(await client.callTool({ name: 'nexode_deployment_requirements', arguments: { type: 'BACKEND' } }));
+    assert.equal(backend.web_analytics, undefined);
+  });
+});

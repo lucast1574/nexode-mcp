@@ -68,6 +68,15 @@ server.registerTool('nexode_app_connect', {
 
 server.registerTool('nexode_compute_list', { description: 'List deployed frontend and backend compute instances.' }, async () => output('/compute'));
 server.registerTool('nexode_compute_get', { description: 'Get a compute instance and its operational status.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}`));
+server.registerTool('nexode_compute_analytics', {
+  description: 'Get owned frontend/landing web analytics, exact installation script (src and data-site), accepted domains, tracking status and 30-day retention. Requires compute:read. Use the returned script in the real app root/head, never guess its URL or compute ID; install once, adapt to the framework, commit/push and redeploy. No API key belongs in website source. Reading does not enable tracking.',
+  inputSchema: { id, days: z.union([z.literal(1), z.literal(7), z.literal(30)]).default(7) },
+}, async ({ id, days }) => output(`/compute/${id}/analytics?days=${days}`));
+server.registerTool('nexode_compute_configure_analytics', {
+  description: 'Enable or pause web analytics for an owned frontend/landing compute (compute:write). Call with enabled=true during an authorized automatic analytics setup, then install the exact script returned by nexode_compute_analytics and redeploy the website. This only changes collection status; it does not edit source or prove events are arriving. Respect explicit opt-outs and preserve paused tracking during unrelated maintenance.',
+  inputSchema: { id, enabled: z.boolean() },
+}, async ({ id, enabled }) => output(`/compute/${id}/analytics`, 'PUT', { enabled }));
+
 server.registerTool('nexode_compute_rename_subdomain', {
   description: 'Rename the generated Nexode hostname of an existing running compute. Convention: landing nombre-del-proyecto.nexode.app, frontend dashboard-nombre-del-proyecto.nexode.app, backend api-nombre-del-proyecto.nexode.app. Identify actual roles with nexode_apps and compute_list/get. Pass nombre-del-proyecto, dashboard-nombre-del-proyecto or api-nombre-del-proyecto, not a URL/full hostname. Assign the base landing first; nested names require the same owner. Requires compute:write. Rejects occupied/reserved names and instances using custom domains. Preserves port, HTTPS settings, repo and infrastructure without rebuild. Old URL has no redirect. Verify every returned HTTPS URL before claiming success; nested names require matching DNS and certificates. Do not rewrite environment URLs automatically.',
   inputSchema: { id, subdomain: z.string().trim().toLowerCase().regex(/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)?$/, 'Pass nombre-del-proyecto, dashboard-nombre-del-proyecto or api-nombre-del-proyecto') },

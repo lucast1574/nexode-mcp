@@ -56,3 +56,7 @@ With a valid Nexode API key and user authorization to connect their local GitHub
 For custom domains, configure apex and wildcard DNS when requested using the actual Nexode routing target, preserving mail/TXT and explicit host records. A wildcard DNS record does not attach hostnames to computes or issue wildcard TLS certificates. Each requested hostname still needs routing and HTTPS verification.
 
 Domains bought through Nexode: use `nexode_domain_register` only for a purchase explicitly requested by the user, return its Stripe checkout URL, and inspect `nexode_domain_get` until `status=active` and `dns_status=ready`. Nexode configures apex and wildcard DNS automatically. Use `nexode_domain_dns` to inspect records, then attach each requested hostname to its intended compute and verify public HTTPS.
+
+## Web analytics
+
+New frontend/landing deployments include automatic source integration through the deployment workflow. `nexode_compute_analytics` returns the exact public script, accepted domains and private stats (`compute:read`). `nexode_compute_configure_analytics` enables/pauses collection (`compute:write`). The coding agent installs the script once, commits/pushes and redeploys; enabling the collector alone does not install it. Existing sites are integrated when requested, and intentional opt-outs/paused states are preserved during unrelated maintenance. See [the integration workflow](skills/nexode-deploy/references/web-analytics.md).
