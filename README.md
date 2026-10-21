@@ -1,5 +1,7 @@
 # Nexode MCP
 
+Build failures: use `nexode_compute_build_logs` with the compute `id`, optional `deployment_id`, and `tail` (1–2000, default 200). It returns the deployment identity, status and log availability separately from runtime container logs. A failed deploy-status response also includes build evidence. Requires the backend build-logs SDK endpoint and `compute:read`; unavailable logs must be reported before attempting speculative fixes.
+
 MCP tools and a shared skill for deploying GitHub/GitLab apps to [Nexode](https://cloud.nexode.app). Node.js 20+ is required. The client runs locally and calls the authenticated Nexode REST API; no extra service on the Nexode server is needed.
 
 ## Connect

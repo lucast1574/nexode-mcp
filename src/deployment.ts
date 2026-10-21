@@ -16,6 +16,8 @@ export const analyticsInstructions = `For a new frontend or landing deployment, 
 
 export const deploymentInstructions = `${authenticationInstructions}
 
+After a failed build, call nexode_compute_build_logs for the failed deployment and inspect the actual error before editing code or redeploying. Preserve the deployment ID and commit SHA when diagnosing; runtime container logs are not build logs. If build logs are unavailable, explicitly report that observability is blocked and do not invent a root cause, repeatedly redeploy, inspect private platform internals, or add GitHub Actions merely to recover missing platform logs. Distinguish a confirmed error from a hypothesis. Read the project's environment-variable usage before changing Dockerfile ENV: HOST may be an application URL parsed with new URL(), not a bind address. Never inject global ENV HOST=0.0.0.0 blindly; configure binding with the actual runtime's supported command/configuration and keep runtime settings out of the build stage unless required.
+
 ${projectNamingInstructions}
 
 ${analyticsInstructions}

@@ -10,6 +10,10 @@ Call `nexode_deployment_requirements` for the selected FRONTEND or BACKEND. Defa
 
 ## Prepare and verify the container
 
+Inspect every use of an environment variable before changing it. `HOST` may be an application URL consumed during compilation, not a listener address. Never blindly add `ENV HOST=0.0.0.0`; prefer the runtime's supported bind flag/configuration and scope runtime variables to the runtime stage.
+
+When a build fails, read `nexode_compute_build_logs` for that deployment before making changes or redeploying. Record its deployment ID/commit and quote the relevant error as evidence. If logs are unavailable, report that limitation; do not guess the cause, repeat speculative redeploys, inspect private platform internals, or add CI workflows solely to compensate for missing platform logs. Container runtime logs are separate from build logs.
+
 If there is no root `Dockerfile`, create one. Preserve an existing compatible Dockerfile; fix incompatible build, bind address or port settings before deploying. Nexode currently builds the repository root with `Dockerfile`: a monorepo Dockerfile must copy the chosen service and its workspace dependencies from that context. Do not silently deploy another service or rewrite unrelated containers.
 
 Use a production start command and install required OS/runtime dependencies. For compiled stacks, build the actual artifact and copy it into the runtime image. For static frontends, serve the build output with a production HTTP server; configure SPA fallback only where the app needs it. Do not leave dev servers, watch mode, or a process that exits immediately as the deployment command.

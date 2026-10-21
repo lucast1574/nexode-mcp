@@ -116,7 +116,11 @@ server.registerTool('nexode_compute_create_preview', {
   inputSchema: { id, branch: z.string().optional(), pull_request: z.number().int().positive().optional(), ttl_hours: z.number().int().min(1).max(72).default(24), env_content: z.string().optional() },
 }, async ({ id, branch, pull_request, ttl_hours, env_content }) => output(`/compute/${id}/previews`, 'POST', { branch, pull_request, ttl_hours, env_content }));
 server.registerTool('nexode_compute_delete_preview', { description: 'Delete a temporary preview and free its compute resources.', inputSchema: { id, preview_id: nonempty } }, async ({ id, preview_id }) => output(`/compute/${id}/previews/${encode(preview_id)}`, 'DELETE'));
-server.registerTool('nexode_compute_logs', { description: 'Read recent compute logs to diagnose a deployment.', inputSchema: { id, tail: z.number().int().min(1).max(2000).default(200) } }, async ({ id, tail }) => output(`/compute/${id}/logs?tail=${tail}`));
+server.registerTool('nexode_compute_build_logs', {
+  description: 'Read build logs for the latest or a specific deployment. Use after a failed build BEFORE changing code or redeploying. Returns deployment identity, status, log availability and a bounded log tail; runtime logs are separate. If unavailable, report the observability failure instead of guessing a cause.',
+  inputSchema: { id, deployment_id: z.string().min(1).max(200).optional(), tail: z.number().int().min(1).max(2000).default(200) },
+}, async ({ id, deployment_id, tail }) => output(`/compute/${id}/build-logs?tail=${tail}${deployment_id ? `&deployment_id=${encode(deployment_id)}` : ''}`));
+server.registerTool('nexode_compute_logs', { description: 'Read runtime container logs. These do not include Docker build output; use nexode_compute_build_logs for build failures.', inputSchema: { id, tail: z.number().int().min(1).max(2000).default(200) } }, async ({ id, tail }) => output(`/compute/${id}/logs?tail=${tail}`));
 server.registerTool('nexode_compute_redeploy', { description: 'Trigger a rebuild and redeployment of an existing compute instance. For local code changes, first check deployment requirements, preserve the existing compute port, prepare/test its Dockerfile, commit/push and verify the remote SHA.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/restart`, 'POST'));
 server.registerTool('nexode_compute_set_env', {
   description: 'Merge environment variables into a compute instance without returning secret values. Requires compute:write. Redeploy after changing variables.',

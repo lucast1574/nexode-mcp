@@ -29,6 +29,27 @@ async function withMcp(handler, run) {
 
 const data = result => JSON.parse(result.content[0].text);
 
+test('build logs select the deployment safely and preserve actionable failure evidence', async () => {
+  const paths = [], id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  await withMcp((req, res) => {
+    paths.push(req.url);
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ deployment: { id: 'failed', status: 'error', commitSha: 'abcdef123' },
+      log_status: 'available', log: 'TypeError: Invalid URL; input: 0.0.0.0' }));
+  }, async client => {
+    const result = data(await client.callTool({ name: 'nexode_compute_build_logs', arguments: { id, deployment_id: 'failed/a?b', tail: 500 } }));
+    assert.equal(paths[0], `/compute/${id}/build-logs?tail=500&deployment_id=failed%2Fa%3Fb`);
+    assert.match(result.log, /Invalid URL/);
+    assert.equal(result.deployment.commitSha, 'abcdef123');
+    await client.callTool({ name: 'nexode_compute_build_logs', arguments: { id } });
+    assert.equal(paths[1], `/compute/${id}/build-logs?tail=200`);
+    for (const tail of [0, 2001, 1.5]) assert.equal((await client.callTool({ name: 'nexode_compute_build_logs', arguments: { id, tail } })).isError, true);
+    assert.equal(paths.length, 2);
+    assert.match(client.getInstructions(), /before editing code or redeploying/);
+    assert.match(client.getInstructions(), /HOST may be an application URL/);
+  });
+});
+
 test('connect forwards actual stack variable names without accepting credentials', async () => {
   const requests = [], id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
   await withMcp(async (req, res) => {
