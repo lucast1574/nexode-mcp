@@ -29,11 +29,11 @@ codex plugin marketplace add lucast1574/nexode-mcp
 codex plugin add nexode-mcp@nexode
 ```
 
-The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.21 nexode-mcp`.
+The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.22 nexode-mcp`.
 
 ### Other MCP clients
 
-Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.21 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
+Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.22 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
 
 ## What it can do
 
@@ -63,9 +63,11 @@ Domains bought through Nexode: use `nexode_domain_register` only for a purchase 
 
 New frontend/landing deployments include automatic source integration through the deployment workflow. `nexode_compute_analytics` returns the exact public script, accepted domains and private stats (`compute:read`). `nexode_compute_configure_analytics` enables/pauses collection (`compute:write`). The coding agent installs the script once, commits/pushes and redeploys; enabling the collector alone does not install it. Existing sites are integrated when requested, and intentional opt-outs/paused states are preserved during unrelated maintenance. See [the integration workflow](skills/nexode-deploy/references/web-analytics.md).
 
-## Platform behavior in v0.1.21
+## Platform behavior in v0.1.22
 
 - n8n always uses an automatically generated Nexode HTTPS domain. Custom domains are not supported for n8n. All plans that include n8n, including Starter, provision without per-instance CPU or memory caps; subscription slots and available infrastructure still apply.
 - Active plan entitlements are determined by the backend, including subscriptions using coupons or a 100% discount. Catalog prices must not be treated as amounts paid or admin MRR. Admin revenue statistics are not exposed through customer MCP tools.
 - Compute custom domains remain supported. Runtime checks use the active domain and configured health path. Build success and application readiness are separate; database connection failures require dependency diagnosis.
-- These rules are delivered in the MCP initialization instructions as well as the plugin skill. Existing clients pinned to an older tag must update their package reference to `v0.1.21` and restart the MCP process; running sessions do not reload themselves.
+- These rules are delivered in the MCP initialization instructions as well as the plugin skill. Existing clients pinned to an older tag must update their package reference to `v0.1.22` and restart the MCP process; running sessions do not reload themselves.
+
+Version 0.1.22 also documents the n8n telemetry/edge-auth conflict and persistent node home. A legacy-storage restart error requires data-preserving platform maintenance; deleting or recreating the instance is not a workaround.
