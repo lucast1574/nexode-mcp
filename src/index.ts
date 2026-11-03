@@ -37,21 +37,21 @@ server.registerTool('nexode_github_connect_local', {
   catch (error) { return { content: [{ type: 'text' as const, text: (error as Error).message }], isError: true }; }
 });
 server.registerTool('nexode_plans', { description: 'List current Nexode plan slugs, prices and resource slots.' }, async () => output('/subscriptions/plans'));
-server.registerTool('nexode_subscriptions', { description: 'List active subscriptions and included slots.' }, async () => output('/subscriptions'));
+server.registerTool('nexode_subscriptions', { description: 'List active subscriptions and included slots. Coupons, including 100% discounts, do not by themselves remove active plan entitlements.' }, async () => output('/subscriptions'));
 server.registerTool('nexode_repositories', {
   description: 'List repositories from a GitHub or GitLab account connected to Nexode. Reuse existing provider authorization. Call only for repository discovery; a Nexode browser session is not required. Report missing provider authorization only if this operation actually fails.',
   inputSchema: { provider: z.enum(['github', 'gitlab']), organization: z.string().optional() },
 }, async ({ provider, organization }) => output(`/repositories/${provider}${organization ? `?${provider === 'github' ? 'org' : 'group'}=${encode(organization)}` : ''}`));
 
 server.registerTool('nexode_apps', { description: 'List visible apps, workspace/team assignments, all service cards and relationships detected from environment configuration. Secret values are never returned. Orphan services are automatically added to My Apps.', }, async () => output('/apps'));
-server.registerTool('nexode_workspaces', { description: 'List your owned and joined workspaces. Each workspace contains at most one app, with three collaborators plus the owner in standard plans.' }, async () => output('/apps/workspaces'));
+server.registerTool('nexode_workspaces', { description: 'List your owned and joined workspaces. Workspaces can contain multiple apps; operations remain scoped to the configured API key workspace.' }, async () => output('/apps/workspaces'));
 server.registerTool('nexode_app_create', {
-  description: 'Create a visual app in My Apps, using a free owned workspace or creating one within plan capacity. Choose this app before deploying its services. One app per workspace.',
+  description: 'Create a visual app in My Apps within the active API key workspace and backend capacity. Choose this app before deploying its services. An explicit workspace_id must match the active scope.',
   inputSchema: { name: z.string().min(3).max(60), workspace_id: id.optional() },
 }, async input => output('/apps', 'POST', input));
 server.registerTool('nexode_app_update', {
-  description: 'Assign an app to a free owned workspace or update its visual service grouping. This only changes grouping: no environment writes or redeploys. Use nexode_apps to inspect manually configured relationships.',
-  inputSchema: { id, name: z.string().min(3).max(60).optional(), workspace_id: id.optional(), landing_id: id.nullable().optional(), frontend_id: id.nullable().optional(), backend_id: id.nullable().optional(), database_id: id.nullable().optional(), n8n_id: id.nullable().optional(), domain_id: id.nullable().optional(), use_storage: z.boolean().optional() },
+  description: 'Update an app name or visual service grouping in its current workspace. Moving apps between workspaces is not supported. No environment writes or redeploys. Use nexode_apps to inspect manually configured relationships.',
+  inputSchema: { id, name: z.string().min(3).max(60).optional(), landing_id: id.nullable().optional(), frontend_id: id.nullable().optional(), backend_id: id.nullable().optional(), database_id: id.nullable().optional(), n8n_id: id.nullable().optional(), domain_id: id.nullable().optional(), use_storage: z.boolean().optional() },
 }, async ({ id, ...input }) => output(`/apps/${id}`, 'PUT', input));
 server.registerTool('nexode_app_connect', {
   description: 'Wire owned app services and redeploy affected computes. Inspect the actual app configuration first and pass its variable NAMES in variables (not URLs or secrets): frontend_api, database, backend_app, backend_cors, backend_landing, frontend_landing, landing_app. Uses actual current service domains; persists names for future reconnects. Database/S3 credentials stay server-side, backend only. Existing unrelated CORS origins are retained. Legacy defaults without a mapping are NEXT_PUBLIC_API_URL and DATABASE_URL; do not assume your app reads them. Requires apps:write, compute:write, databases:connect and storage:connect. Third-party OAuth authorized domains and Stripe callbacks need separate provider configuration and login verification.',
@@ -103,7 +103,7 @@ server.registerTool('nexode_compute_create', {
     return { content: [{ type: 'text' as const, text: (error as Error).message }], isError: true };
   }
 });
-server.registerTool('nexode_compute_deploy_status', { description: 'Check the current deploy status for a compute instance.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/deploy-status`));
+server.registerTool('nexode_compute_deploy_status', { description: 'Check deployment and runtime status. Health uses the active custom domain when configured, otherwise the generated domain. Inspect build logs for build errors and runtime/dependency logs for readiness failures.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/deploy-status`));
 server.registerTool('nexode_compute_deployments', { description: 'List deployment history for a compute instance.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/deployments`));
 server.registerTool('nexode_compute_diagnose', { description: 'Diagnose deployment, health endpoint, DNS and missing environment variables without returning secret values.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}/diagnosis`));
 server.registerTool('nexode_compute_rollback', {

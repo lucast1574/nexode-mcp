@@ -29,11 +29,11 @@ codex plugin marketplace add lucast1574/nexode-mcp
 codex plugin add nexode-mcp@nexode
 ```
 
-The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.20 nexode-mcp`.
+The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.21 nexode-mcp`.
 
 ### Other MCP clients
 
-Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.20 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
+Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.21 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
 
 ## What it can do
 
@@ -41,7 +41,7 @@ Configure a stdio server with command `npx`, arguments `--yes --package=github:l
 - Repair older generated URLs with `nexode_compute_rename_subdomain` (`id`, `subdomain: "nombre-del-proyecto"`, `"dashboard-nombre-del-proyecto"`, or `"api-nombre-del-proyecto"`; `compute:write`). Routes and stored public URLs change together without rebuilding or changing port/HTTPS settings. Old URLs have no redirect. Existing deployments stay unchanged until a migration is requested. Verify DNS, HTTPS certificates, and dependent API/CORS/auth/webhook URLs; route updates alone do not repair application configuration.
 
 - Prepare local code before deployment: the coding agent detects the stack, creates/adapts a production Dockerfile, aligns the real HTTP listener with Nexode (frontend/landing 3000, backend 4000 by default), verifies the container where Docker is available, then commits and pushes using configured local Git. `nexode_deployment_requirements` supplies the same port contract to clients with or without the plugin skill.
-- Keep deployments visible in My Apps: select/create an app and workspace, pass `app_id` when creating services, and inspect the visual grouping and environment-derived connections without exposing values. One app per workspace, with three collaborators plus the owner in standard plans.
+- Keep deployments visible in My Apps: select/create an app and workspace, pass `app_id` when creating services, and inspect the visual grouping and environment-derived connections without exposing values. Workspaces support multiple apps within backend capacity. Operations use the API key workspace; app updates cannot move apps between workspaces.
 - Check identity, subscriptions, available service slots and connected repositories.
 - Create and inspect frontend/backend compute instances; check deployment status, history and logs; merge environment variables, link Nexode databases without disclosing their URIs, redeploy and attach domains.
 - Provision a private S3 bucket when creating a backend with `connect_storage: true`, or attach S3 to an existing backend with `nexode_compute_link_storage`. Nexode injects `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_FORCE_PATH_STYLE`; the MCP response never contains the secret. Redeploy an existing backend after linking.
@@ -62,3 +62,10 @@ Domains bought through Nexode: use `nexode_domain_register` only for a purchase 
 ## Web analytics
 
 New frontend/landing deployments include automatic source integration through the deployment workflow. `nexode_compute_analytics` returns the exact public script, accepted domains and private stats (`compute:read`). `nexode_compute_configure_analytics` enables/pauses collection (`compute:write`). The coding agent installs the script once, commits/pushes and redeploys; enabling the collector alone does not install it. Existing sites are integrated when requested, and intentional opt-outs/paused states are preserved during unrelated maintenance. See [the integration workflow](skills/nexode-deploy/references/web-analytics.md).
+
+## Platform behavior in v0.1.21
+
+- n8n always uses an automatically generated Nexode HTTPS domain. Custom domains are not supported for n8n. All plans that include n8n, including Starter, provision without per-instance CPU or memory caps; subscription slots and available infrastructure still apply.
+- Active plan entitlements are determined by the backend, including subscriptions using coupons or a 100% discount. Catalog prices must not be treated as amounts paid or admin MRR. Admin revenue statistics are not exposed through customer MCP tools.
+- Compute custom domains remain supported. Runtime checks use the active domain and configured health path. Build success and application readiness are separate; database connection failures require dependency diagnosis.
+- These rules are delivered in the MCP initialization instructions as well as the plugin skill. Existing clients pinned to an older tag must update their package reference to `v0.1.21` and restart the MCP process; running sessions do not reload themselves.

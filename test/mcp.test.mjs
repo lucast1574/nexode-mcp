@@ -191,14 +191,14 @@ test('app/workspace tools and service creation keep explicit app assignments', a
     for (const [name, args] of [
       ['nexode_apps', {}], ['nexode_workspaces', {}],
       ['nexode_app_create', { name: 'Demo app', workspace_id }],
-      ['nexode_app_update', { id: app_id, workspace_id }],
+      ['nexode_app_update', { id: app_id, name: 'Renamed app' }],
       ['nexode_compute_create', { name: 'Demo landing', type: 'FRONTEND', provider: 'GITHUB', repository_url: 'https://github.com/example/app', app_id, app_role: 'landing', subdomain: 'demo' }],
       ['nexode_database_create', { name: 'Demo data', type: 'postgres', app_id }],
       ['nexode_n8n_create', { name: 'Demo flows', app_id }],
     ]) assert.notEqual((await client.callTool({ name, arguments: args })).isError, true);
     assert.deepEqual(received.slice(0, 4).map(r => [r.method, r.path]), [['GET', '/apps'], ['GET', '/apps/workspaces'], ['POST', '/apps'], ['PUT', '/apps/' + app_id]]);
     assert.deepEqual(received[2].body, { name: 'Demo app', workspace_id });
-    assert.deepEqual(received[3].body, { workspace_id });
+    assert.deepEqual(received[3].body, { name: 'Renamed app' });
     assert.ok(received.slice(4).every(r => r.body.app_id === app_id));
     assert.equal(received[4].body.app_role, 'landing');
   });
@@ -353,4 +353,40 @@ test('analytics tools return the real installation snippet and toggle without le
     const backend = data(await client.callTool({ name: 'nexode_deployment_requirements', arguments: { type: 'BACKEND' } }));
     assert.equal(backend.web_analytics, undefined);
   });
+});
+
+
+test('current platform contract reaches plain MCP clients and respects n8n slot errors', async () => {
+  const requests = [];
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    requests.push({ path: req.url, body: JSON.parse(raw) });
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ message: 'No available n8n slots' }));
+  }, async client => {
+    const { tools } = await client.listTools();
+    const n8n = tools.find(tool => tool.name === 'nexode_n8n_create');
+    for (const field of ['custom_domain', 'cpu', 'memory']) assert.equal(n8n.inputSchema.properties[field], undefined);
+    assert.equal(tools.find(tool => tool.name === 'nexode_app_update').inputSchema.properties.workspace_id, undefined);
+    const result = await client.callTool({ name: 'nexode_n8n_create', arguments: { name: 'Automation', app_id: 'aaaaaaaaaaaaaaaaaaaaaaaa' } });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0].text, /No available n8n slots/);
+    assert.deepEqual(requests, [{ path: '/n8n', body: { name: 'Automation', app_id: 'aaaaaaaaaaaaaaaaaaaaaaaa' } }]);
+    const instructions = client.getInstructions();
+    assert.match(instructions, /100% discount/);
+    assert.match(instructions, /without per-instance CPU or memory caps/);
+    assert.match(instructions, /Compute custom domains remain supported/);
+    assert.match(instructions, /database connection failure/);
+    assert.doesNotMatch(instructions, /one app per workspace/i);
+  });
+});
+
+test('release manifests and launcher pins match the server version', () => {
+  const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
+  for (const path of ['.codex-plugin/plugin.json', '.claude-plugin/plugin.json']) {
+    assert.equal(JSON.parse(readFileSync(path, 'utf8')).version, version);
+  }
+  for (const path of ['.mcp.json', '.codex-plugin/plugin.json']) {
+    assert.match(readFileSync(path, 'utf8'), new RegExp('nexode-mcp#v' + version.replaceAll('.', '\\.')));
+  }
 });
