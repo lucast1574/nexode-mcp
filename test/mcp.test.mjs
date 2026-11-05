@@ -29,6 +29,74 @@ async function withMcp(handler, run) {
 
 const data = result => JSON.parse(result.content[0].text);
 
+test('current workspace API exposes packages and collaboration without retired app routes', async () => {
+  const requests = [], id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    requests.push({ method: req.method, path: req.url, body: raw ? JSON.parse(raw) : undefined });
+    res.setHeader('Content-Type', 'application/json'); res.end('{"data":[]}');
+  }, async client => {
+    const { tools } = await client.listTools();
+    for (const name of ['nexode_apps', 'nexode_app_create', 'nexode_app_update', 'nexode_app_connect']) assert.ok(!tools.some(t => t.name === name));
+    const create = tools.find(t => t.name === 'nexode_compute_create').inputSchema;
+    assert.ok(!('app_id' in create.properties));
+    assert.ok(!create.required.includes('project_name'));
+    const cases = [
+      ['nexode_workspaces', {}, 'GET', '/workspace'],
+      ['nexode_pricing_catalog', {}, 'GET', '/billing/pricing'],
+      ['nexode_credit_usage', {}, 'GET', '/billing/usage'],
+      ['nexode_database_engines', {}, 'GET', '/databases/engines'],
+      ['nexode_database_get', { id }, 'GET', `/databases/${id}`],
+      ['nexode_database_metrics', { id, hours: 336 }, 'GET', `/databases/${id}/metrics?hours=336`],
+      ['nexode_database_change_package', { id, package: 'standard' }, 'PUT', `/databases/${id}/package`, { package: 'standard' }],
+      ['nexode_database_update_description', { id, description: '' }, 'PUT', `/databases/${id}/description`, { description: '' }],
+      ['nexode_database_restart', { id }, 'POST', `/databases/${id}/restart`],
+      ['nexode_n8n_get', { id }, 'GET', `/n8n/${id}`],
+      ['nexode_domain_search', { query: 'my app' }, 'GET', '/domains/search?q=my%20app'],
+      ['nexode_domain_add_dns', { id, type: 'MX', name: '', content: 'mail.example.com', ttl: 600, prio: 10 }, 'POST', `/domains/${id}/dns`, { type: 'MX', name: '', content: 'mail.example.com', ttl: 600, prio: 10 }],
+      ['nexode_shield_repos', {}, 'GET', '/shield/repos'],
+      ['nexode_shield_scan', { repo_id: id }, 'POST', '/shield/scans', { repo_id: id }],
+      ['nexode_shield_get_scan', { id }, 'GET', `/shield/scans/${id}`],
+      ['nexode_shield_findings', { id, severity: 'HIGH', only_new: true }, 'GET', `/shield/scans/${id}/findings?offset=0&limit=50&severity=HIGH&only_new=true&include_suppressed=false`],
+      ['nexode_notifications', {}, 'GET', '/notifications'],
+      ['nexode_notification_mark_viewed', { id }, 'POST', `/notifications/${id}/viewed`],
+      ['nexode_notifications_mark_all_viewed', {}, 'POST', '/notifications/viewed'],
+      ['nexode_support_tickets', { state: 'WAITING', page: 2 }, 'GET', '/support/tickets?page=2&state=WAITING'],
+      ['nexode_support_create_ticket', { title: 'Database issue', description: 'Please inspect this database issue.', request_id: 'b43145e1-f526-4ee5-84eb-c43187a49541' }, 'POST', '/support/tickets', { title: 'Database issue', description: 'Please inspect this database issue.', requestId: 'b43145e1-f526-4ee5-84eb-c43187a49541' }],
+    ];
+    for (const [name, args, method, path, body] of cases) {
+      assert.notEqual((await client.callTool({ name, arguments: args })).isError, true, name);
+      assert.deepEqual(requests.at(-1), { method, path, body }, name);
+    }
+    const before = requests.length;
+    for (const [name, args] of [
+      ['nexode_database_metrics', { id, hours: 2 }],
+      ['nexode_database_change_package', { id, package: 'ultra' }],
+      ['nexode_support_create_ticket', { title: 'Issue', description: 'Please help me', request_id: 'not-a-uuid' }],
+      ['nexode_n8n_create', { name: 'Flows', username: 'user' }],
+    ]) assert.equal((await client.callTool({ name, arguments: args })).isError, true);
+    assert.equal(requests.length, before);
+    assert.match(client.getInstructions(), /not an invoice cap/);
+    assert.match(client.getInstructions(), /only on explicit user instruction/);
+  });
+});
+
+test('service creation forwards package/version without app lookups or grouping hints', async () => {
+  const requests = [];
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    requests.push({ path: req.url, body: JSON.parse(raw) });
+    res.setHeader('Content-Type', 'application/json'); res.end('{}');
+  }, async client => {
+    await client.callTool({ name: 'nexode_compute_create', arguments: { name: 'Demo backend', project_name: 'Demo', app_role: 'backend', type: 'BACKEND', provider: 'GITHUB', repository_url: 'https://github.com/example/app', package: 'ultra', port: 8080 } });
+    assert.deepEqual(requests[0], { path: '/compute', body: { name: 'Demo backend', type: 'BACKEND', provider: 'GITHUB', repository_url: 'https://github.com/example/app', branch: 'main', package: 'ultra', port: 8080, subdomain: 'api-demo' } });
+    await client.callTool({ name: 'nexode_database_create', arguments: { name: 'Demo data', type: 'postgres', version: '17', package: 'standard' } });
+    assert.deepEqual(requests[1], { path: '/databases', body: { name: 'Demo data', type: 'postgres', version: '17', package: 'standard' } });
+    await client.callTool({ name: 'nexode_n8n_create', arguments: { name: 'Demo flows', package: 'pro' } });
+    assert.deepEqual(requests[2], { path: '/n8n', body: { name: 'Demo flows', package: 'pro' } });
+  });
+});
+
 test('build logs select the deployment safely and preserve actionable failure evidence', async () => {
   const paths = [], id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
   await withMcp((req, res) => {
@@ -50,27 +118,8 @@ test('build logs select the deployment safely and preserve actionable failure ev
   });
 });
 
-test('connect forwards actual stack variable names without accepting credentials', async () => {
-  const requests = [], id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
-  await withMcp(async (req, res) => {
-    let raw = ''; for await (const chunk of req) raw += chunk;
-    requests.push({ method: req.method, path: req.url, body: JSON.parse(raw) });
-    res.setHeader('Content-Type', 'application/json'); res.end('{"updated":[],"warnings":[]}');
-  }, async client => {
-    const variables = { frontend_api: 'BACKEND_URL', database: 'MONGODB_URI', backend_app: 'APP_URL',
-      backend_cors: 'CORS_ORIGIN', backend_landing: 'LANDING_URL', frontend_landing: 'PUBLIC_LANDING_URL', landing_app: 'PUBLIC_APP_URL' };
-    const result = await client.callTool({ name: 'nexode_app_connect', arguments: { id, variables } });
-    assert.notEqual(result.isError, true);
-    assert.deepEqual(requests, [{ method: 'POST', path: `/apps/${id}/connect`, body: { variables } }]);
-    for (const variables of [{ database: 'mongodb://password@host' }, { frontend_api: 'BAD-NAME' }, { secret: 'S3_SECRET_ACCESS_KEY' }]) {
-      assert.equal((await client.callTool({ name: 'nexode_app_connect', arguments: { id, variables } })).isError, true);
-    }
-    assert.equal(requests.length, 1);
-  });
-});
-
 test('first deploy defaults to the app name for landing, dashboard and API', async () => {
-  const received = [], app_id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  const received = [];
   await withMcp(async (req, res) => {
     let raw = ''; for await (const chunk of req) raw += chunk;
     received.push({ path: req.url, method: req.method, body: raw ? JSON.parse(raw) : null });
@@ -79,18 +128,18 @@ test('first deploy defaults to the app name for landing, dashboard and API', asy
   }, async client => {
     for (const [app_role, type, expected] of [['landing', 'FRONTEND', 'sheeplink'], ['frontend', 'FRONTEND', 'dashboard-sheeplink'], ['backend', 'BACKEND', 'api-sheeplink']]) {
       const result = await client.callTool({ name: 'nexode_compute_create', arguments: {
-        name: 'ugly-repo-random123', app_id, app_role, type, provider: 'GITHUB', repository_url: 'https://github.com/example/repo',
+        name: 'ugly-repo-random123', project_name: 'Sheeplink', app_role, type, provider: 'GITHUB', repository_url: 'https://github.com/example/repo',
       } });
       assert.notEqual(result.isError, true);
       assert.equal(received.at(-1).body.subdomain, expected);
       assert.equal(data(result).generated_domain, expected + '.nexode.app');
     }
-    assert.equal(received.filter(r => r.method === 'GET').length, 3);
+    assert.equal(received.filter(r => r.method === 'GET').length, 0);
     const result = await client.callTool({ name: 'nexode_compute_create', arguments: {
-      name: 'custom', app_id, type: 'FRONTEND', provider: 'GITHUB', repository_url: 'https://github.com/example/repo', custom_domain: 'www.example.org',
+      name: 'custom', project_name: 'Sheeplink', type: 'FRONTEND', provider: 'GITHUB', repository_url: 'https://github.com/example/repo', custom_domain: 'www.example.org',
     } });
     assert.notEqual(result.isError, true);
-    assert.equal(received.filter(r => r.method === 'GET').length, 3);
+    assert.equal(received.filter(r => r.method === 'GET').length, 0);
     assert.equal(received.at(-1).body.subdomain, undefined);
   });
 });
@@ -126,7 +175,7 @@ test('MCP handshake, tools and scoped API errors', async () => {
     assert.ok(client.getInstructions()?.length);
     const { tools } = await client.listTools();
     const names = tools.map(tool => tool.name);
-    for (const name of ['nexode_apps', 'nexode_workspaces', 'nexode_app_create', 'nexode_app_update', 'nexode_app_connect', 'nexode_deployment_requirements', 'nexode_me', 'nexode_github_connect_local', 'nexode_plans', 'nexode_repositories', 'nexode_compute_create', 'nexode_compute_deploy_status', 'nexode_compute_set_env', 'nexode_compute_link_database', 'nexode_storage_get', 'nexode_compute_link_storage', 'nexode_n8n_restart']) {
+    for (const name of ['nexode_workspaces', 'nexode_pricing_catalog', 'nexode_credit_usage', 'nexode_database_engines', 'nexode_deployment_requirements', 'nexode_me', 'nexode_github_connect_local', 'nexode_plans', 'nexode_repositories', 'nexode_compute_create', 'nexode_compute_deploy_status', 'nexode_compute_set_env', 'nexode_compute_link_database', 'nexode_storage_get', 'nexode_compute_link_storage', 'nexode_n8n_restart']) {
       assert.ok(names.includes(name), `${name} missing`);
     }
     const result = await client.callTool({ name: 'nexode_me', arguments: {} });
@@ -165,7 +214,7 @@ test('compute creation forwards the exact prepared port including defaults', asy
   }, async client => {
     for (const [type, port] of [['FRONTEND', undefined], ['BACKEND', undefined], ['FRONTEND', 8080]]) {
       const result = await client.callTool({ name: 'nexode_compute_create', arguments: {
-        name: 'test-app', type, provider: 'GITHUB', repository_url: 'https://github.com/example/app', app_id: 'aaaaaaaaaaaaaaaaaaaaaaaa', subdomain: 'test-app', ...(port ? { port } : {}),
+        name: 'test-app', type, provider: 'GITHUB', repository_url: 'https://github.com/example/app', subdomain: 'test-app', ...(port ? { port } : {}),
       } });
       assert.notEqual(result.isError, true);
     }
@@ -180,30 +229,6 @@ test('compute creation forwards the exact prepared port including defaults', asy
 });
 
 
-test('app/workspace tools and service creation keep explicit app assignments', async () => {
-  const received = [];
-  await withMcp(async (req, res) => {
-    let raw = ''; for await (const chunk of req) raw += chunk;
-    received.push({ path: req.url, method: req.method, body: raw ? JSON.parse(raw) : null });
-    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ data: [] }));
-  }, async client => {
-    const app_id = 'aaaaaaaaaaaaaaaaaaaaaaaa', workspace_id = 'bbbbbbbbbbbbbbbbbbbbbbbb';
-    for (const [name, args] of [
-      ['nexode_apps', {}], ['nexode_workspaces', {}],
-      ['nexode_app_create', { name: 'Demo app', workspace_id }],
-      ['nexode_app_update', { id: app_id, name: 'Renamed app' }],
-      ['nexode_compute_create', { name: 'Demo landing', type: 'FRONTEND', provider: 'GITHUB', repository_url: 'https://github.com/example/app', app_id, app_role: 'landing', subdomain: 'demo' }],
-      ['nexode_database_create', { name: 'Demo data', type: 'postgres', app_id }],
-      ['nexode_n8n_create', { name: 'Demo flows', app_id }],
-    ]) assert.notEqual((await client.callTool({ name, arguments: args })).isError, true);
-    assert.deepEqual(received.slice(0, 4).map(r => [r.method, r.path]), [['GET', '/apps'], ['GET', '/apps/workspaces'], ['POST', '/apps'], ['PUT', '/apps/' + app_id]]);
-    assert.deepEqual(received[2].body, { name: 'Demo app', workspace_id });
-    assert.deepEqual(received[3].body, { name: 'Renamed app' });
-    assert.ok(received.slice(4).every(r => r.body.app_id === app_id));
-    assert.equal(received[4].body.app_role, 'landing');
-  });
-});
-
 test('a configured API key operates Nexode without a browser session or login requests', async () => {
   const received = [];
   await withMcp((req, res) => {
@@ -214,10 +239,10 @@ test('a configured API key operates Nexode without a browser session or login re
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(req.url === '/me' ? { id: 'aaaaaaaaaaaaaaaaaaaaaaaa', scopes: ['*'] } : { data: [] }));
   }, async client => {
-    for (const name of ['nexode_me', 'nexode_apps', 'nexode_compute_list', 'nexode_database_list', 'nexode_n8n_list']) {
+    for (const name of ['nexode_me', 'nexode_workspaces', 'nexode_compute_list', 'nexode_database_list', 'nexode_n8n_list']) {
       assert.notEqual((await client.callTool({ name, arguments: {} })).isError, true, name);
     }
-    assert.deepEqual(received.map(req => req.path), ['/me', '/apps', '/compute', '/databases', '/n8n']);
+    assert.deepEqual(received.map(req => req.path), ['/me', '/workspace', '/compute', '/databases', '/n8n']);
     assert.ok(received.every(req => req.cookie === undefined));
   });
 });
@@ -367,11 +392,11 @@ test('current platform contract reaches plain MCP clients and respects n8n slot 
     const { tools } = await client.listTools();
     const n8n = tools.find(tool => tool.name === 'nexode_n8n_create');
     for (const field of ['custom_domain', 'cpu', 'memory']) assert.equal(n8n.inputSchema.properties[field], undefined);
-    assert.equal(tools.find(tool => tool.name === 'nexode_app_update').inputSchema.properties.workspace_id, undefined);
-    const result = await client.callTool({ name: 'nexode_n8n_create', arguments: { name: 'Automation', app_id: 'aaaaaaaaaaaaaaaaaaaaaaaa' } });
+    assert.equal(tools.find(tool => tool.name === 'nexode_app_update'), undefined);
+    const result = await client.callTool({ name: 'nexode_n8n_create', arguments: { name: 'Automation' } });
     assert.equal(result.isError, true);
     assert.match(result.content[0].text, /No available n8n slots/);
-    assert.deepEqual(requests, [{ path: '/n8n', body: { name: 'Automation', app_id: 'aaaaaaaaaaaaaaaaaaaaaaaa' } }]);
+    assert.deepEqual(requests, [{ path: '/n8n', body: { name: 'Automation' } }]);
     const instructions = client.getInstructions();
     assert.match(instructions, /100% discount/);
     assert.match(instructions, /without per-instance CPU or memory caps/);

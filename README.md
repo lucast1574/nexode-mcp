@@ -29,27 +29,26 @@ codex plugin marketplace add lucast1574/nexode-mcp
 codex plugin add nexode-mcp@nexode
 ```
 
-The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.22 nexode-mcp`.
+The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.23 nexode-mcp`.
 
 ### Other MCP clients
 
-Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.22 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
+Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.23 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
 
 ## What it can do
 
-- Ask for the project name before its first deploy and use it for clean default URLs: `nombre-del-proyecto.nexode.app` (landing), `dashboard-nombre-del-proyecto.nexode.app` (frontend), and `api-nombre-del-proyecto.nexode.app` (backend). Compute creation requires `app_id`; the tool derives the name from the selected app and reuses its reserved namespace. Custom domains take precedence. Occupied/reserved names produce an error instead of random suffixes.
+- Ask for the project name before its first deploy and use it for clean default URLs: `nombre-del-proyecto.nexode.app` (landing), `dashboard-nombre-del-proyecto.nexode.app` (frontend), and `api-nombre-del-proyecto.nexode.app` (backend). Pass `project_name` and `app_role` as local naming hints; no app group or `app_id` exists. Custom domains take precedence. Occupied/reserved names produce an error instead of random suffixes.
 - Repair older generated URLs with `nexode_compute_rename_subdomain` (`id`, `subdomain: "nombre-del-proyecto"`, `"dashboard-nombre-del-proyecto"`, or `"api-nombre-del-proyecto"`; `compute:write`). Routes and stored public URLs change together without rebuilding or changing port/HTTPS settings. Old URLs have no redirect. Existing deployments stay unchanged until a migration is requested. Verify DNS, HTTPS certificates, and dependent API/CORS/auth/webhook URLs; route updates alone do not repair application configuration.
 
 - Prepare local code before deployment: the coding agent detects the stack, creates/adapts a production Dockerfile, aligns the real HTTP listener with Nexode (frontend/landing 3000, backend 4000 by default), verifies the container where Docker is available, then commits and pushes using configured local Git. `nexode_deployment_requirements` supplies the same port contract to clients with or without the plugin skill.
-- Keep deployments visible in My Apps: select/create an app and workspace, pass `app_id` when creating services, and inspect the visual grouping and environment-derived connections without exposing values. Workspaces support multiple apps within backend capacity. Operations use the API key workspace; app updates cannot move apps between workspaces.
-- Check identity, subscriptions, available service slots and connected repositories.
+- Check identity, subscriptions, credit balances, usage packages and legacy entitlements and connected repositories.
 - Create and inspect frontend/backend compute instances; check deployment status, history and logs; merge environment variables, link Nexode databases without disclosing their URIs, redeploy and attach domains.
 - Provision a private S3 bucket when creating a backend with `connect_storage: true`, or attach S3 to an existing backend with `nexode_compute_link_storage`. Nexode injects `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_FORCE_PATH_STYLE`; the MCP response never contains the secret. Redeploy an existing backend after linking.
-- Create/list databases and n8n; Nexode assigns a free subscription slot automatically. Browse SQL tables, MongoDB documents and Redis keys; edit individual values or delete records and fields with database-specific safeguards.
+- Create/list databases and n8n; Choose a credit package; legacy bundles retain their available slots. Browse SQL tables, MongoDB documents and Redis keys; edit individual values or delete records and fields with database-specific safeguards.
 - Add domains purchased elsewhere with `nexode_domain_add_external`, retrieve the exact DNS TXT challenge with `nexode_domain_get`, and verify it with `nexode_domain_verify_external`. The existing DNS provider keeps managing DNS; activation requires matching ownership proof. This does not purchase or transfer the domain.
 - Run and list database backups, verify a restore in a temporary database, or restore a selected copy after confirmation. Inspect deployment history and diagnosis, create password-protected branch/PR previews, and roll back to retained images. Check domains; list and start Shield scans.
 
-Nexode provisions from a pushed Git repository. Preparation happens before compute creation or a code redeploy. The MCP provides platform requirements; the coding agent uses its local file/shell tools to prepare the Dockerfile and its own Git tooling to commit and push code; the Nexode API key does not grant GitHub or GitLab access. Compute read endpoints omit stored credentials and environment content. Provisioning still obeys plan slots and the backend's superadmin bypass.
+Nexode provisions from a pushed Git repository. Preparation happens before compute creation or a code redeploy. The MCP provides platform requirements; the coding agent uses its local file/shell tools to prepare the Dockerfile and its own Git tooling to commit and push code; the Nexode API key does not grant GitHub or GitLab access. Compute read endpoints omit stored credentials and environment content. Provisioning obeys credit-plan usage checks or legacy bundle entitlements and the backend's superadmin bypass.
 
 ### Reuse GitHub already authenticated on this PC
 
@@ -63,11 +62,22 @@ Domains bought through Nexode: use `nexode_domain_register` only for a purchase 
 
 New frontend/landing deployments include automatic source integration through the deployment workflow. `nexode_compute_analytics` returns the exact public script, accepted domains and private stats (`compute:read`). `nexode_compute_configure_analytics` enables/pauses collection (`compute:write`). The coding agent installs the script once, commits/pushes and redeploys; enabling the collector alone does not install it. Existing sites are integrated when requested, and intentional opt-outs/paused states are preserved during unrelated maintenance. See [the integration workflow](skills/nexode-deploy/references/web-analytics.md).
 
-## Platform behavior in v0.1.22
+## Platform behavior in v0.1.23
 
-- n8n always uses an automatically generated Nexode HTTPS domain. Custom domains are not supported for n8n. All plans that include n8n, including Starter, provision without per-instance CPU or memory caps; subscription slots and available infrastructure still apply.
+- n8n always uses an automatically generated Nexode HTTPS domain. Custom domains are not supported for n8n. n8n runs without per-instance CPU or memory caps; credit packages set its usage price and legacy bundle slots still apply.
 - Active plan entitlements are determined by the backend, including subscriptions using coupons or a 100% discount. Catalog prices must not be treated as amounts paid or admin MRR. Admin revenue statistics are not exposed through customer MCP tools.
 - Compute custom domains remain supported. Runtime checks use the active domain and configured health path. Build success and application readiness are separate; database connection failures require dependency diagnosis.
-- These rules are delivered in the MCP initialization instructions as well as the plugin skill. Existing clients pinned to an older tag must update their package reference to `v0.1.22` and restart the MCP process; running sessions do not reload themselves.
+- These rules are delivered in the MCP initialization instructions as well as the plugin skill. Existing clients pinned to an older tag must update their package reference to `v0.1.23` and restart the MCP process; running sessions do not reload themselves.
 
-Version 0.1.22 also documents the n8n telemetry/edge-auth conflict and persistent node home. A legacy-storage restart error requires data-preserving platform maintenance; deleting or recreating the instance is not a workaround.
+Version 0.1.23 also documents the n8n telemetry/edge-auth conflict and persistent node home. A legacy-storage restart error requires data-preserving platform maintenance; deleting or recreating the instance is not a workaround.
+
+
+## Workspace and credit-plan API
+
+Services live directly in the active API-key workspace. The removed My Apps registry and tools nexode_apps/app_create/app_update/app_connect are no longer used. Creation no longer requires app_id. nexode_workspaces reads /workspace without switching a bound key.
+
+Read nexode_pricing_catalog and nexode_credit_usage before provisioning. Hobby/Pro/Team grant monthly credits; hourly usage consumes them. Excess is billed at period end, credits never roll over, and the provisioning threshold is not an invoice cap. Legacy bundles retain their entitlements; shadow usage is a reference estimate. Choose package on compute/database/n8n creation; select database versions from nexode_database_engines.
+
+New tools cover database get/restart/metrics/package/description, compute and n8n deletion, domain search and DNS creation, the full Shield SDK scan workflow, shared support tickets and notifications. Resource reads omit credentials. Support submission requires an explicit request to contact support and a request_id UUID reused on retries.
+
+The companion platform SDK revision adds /billing/pricing, /billing/usage, /workspace, /databases/engines, database metrics/package/description, /support/tickets and /notifications. Deploy that backend revision before using these endpoints. Billing reads require subscriptions:read; collaboration uses support:read/write and notifications:read/write. Account/session changes, billing checkout and administrator operations stay in the dashboard. A missing endpoint is not a reason to ask for browser login.

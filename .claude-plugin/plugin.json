@@ -1,6 +1,6 @@
 {
   "name": "nexode-mcp",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "description": "Deploy and manage Nexode applications with an API key.",
   "author": { "name": "Nexode" }
 }

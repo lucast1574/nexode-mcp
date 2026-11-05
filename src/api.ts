@@ -44,3 +44,12 @@ export async function request(path: string, init: { method?: 'GET' | 'POST' | 'P
   }
   return data;
 }
+
+/** Keep API errors in MCP tool results without losing the server's explanation. */
+export async function output(path: string, method?: 'GET' | 'POST' | 'PUT' | 'DELETE', body?: unknown) {
+  try {
+    return { content: [{ type: 'text' as const, text: JSON.stringify(await request(path, { method, body })) }] };
+  } catch (error) {
+    return { content: [{ type: 'text' as const, text: (error as Error).message }], isError: true };
+  }
+}
