@@ -421,3 +421,62 @@ test('release manifests and launcher pins match the server version', () => {
     assert.match(readFileSync(path, 'utf8'), new RegExp('nexode-mcp#v' + version.replaceAll('.', '\\.')));
   }
 });
+
+
+test('expanded operations use real SDK routes, encode identifiers and reject invalid inputs', async () => {
+  const requests = [], id = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    requests.push({ method: req.method, path: req.url, body: raw ? JSON.parse(raw) : undefined });
+    res.setHeader('Content-Type', 'application/json'); res.end('{}');
+  }, async client => {
+    const cases = [
+      ['nexode_capabilities', {}, 'GET', '/'],
+      ['nexode_stack_templates', {}, 'GET', '/stacks/templates'],
+      ['nexode_stacks', {}, 'GET', '/stacks'],
+      ['nexode_stack_create', { name: 'my-flows', template: 'n8n', variant: 'postgres', package: 'pro' }, 'POST', '/stacks', { name: 'my-flows', template: 'n8n', variant: 'postgres', package: 'pro' }],
+      ['nexode_stack_get', { id }, 'GET', `/stacks/${id}`],
+      ['nexode_stack_delete', { id }, 'DELETE', `/stacks/${id}`],
+      ['nexode_compute_set_paused', { id, paused: true }, 'PUT', `/compute/${id}/paused`, { paused: true }],
+      ['nexode_compute_change_package', { id, package: 'ultra' }, 'PUT', `/compute/${id}/package`, { package: 'ultra' }],
+      ['nexode_compute_update_build', { id, build_type: 'railpack', root_directory: 'backend' }, 'PUT', `/compute/${id}/build`, { build_type: 'railpack', root_directory: 'backend' }],
+      ['nexode_compute_update_image', { id, docker_image: 'nginx', docker_tag: 'stable' }, 'PUT', `/compute/${id}/image`, { docker_image: 'nginx', docker_tag: 'stable' }],
+      ['nexode_compute_add_volume', { id, mount_path: '/data' }, 'POST', `/compute/${id}/volumes`, { mount_path: '/data' }],
+      ['nexode_compute_remove_volume', { id, mount_path: '/data' }, 'DELETE', `/compute/${id}/volumes`, { mount_path: '/data' }],
+      ['nexode_compute_metrics', { id, hours: 12 }, 'GET', `/compute/${id}/metrics?hours=12`],
+      ['nexode_compute_delete_domain', { id, domain_id: 'route/a?b' }, 'DELETE', `/compute/${id}/domains/route%2Fa%3Fb`],
+      ['nexode_database_rotate_password', { id }, 'POST', `/databases/${id}/rotate-password`],
+      ['nexode_database_unlock_writes', { id }, 'POST', `/databases/${id}/unlock-writes`],
+      ['nexode_storage_buckets', {}, 'GET', '/storage/buckets'],
+      ['nexode_storage_objects', { bucket: 'assets', prefix: 'a/b', continuation_token: 'a+b' }, 'GET', '/storage/objects?bucket=assets&prefix=a%2Fb&continuation_token=a%2Bb'],
+      ['nexode_storage_create_key', { name: 'Read assets', bucket: 'assets', permission: 'read', prefix: 'public/', expires_in_days: 7 }, 'POST', '/storage/keys', { name: 'Read assets', bucket: 'assets', permission: 'read', prefix: 'public/', expires_in_days: 7 }],
+      ['nexode_storage_upload_url', { bucket: 'assets', key: 'a/b.png', content_type: 'image/png' }, 'POST', '/storage/upload-url', { bucket: 'assets', key: 'a/b.png', content_type: 'image/png' }],
+      ['nexode_storage_delete_object', { bucket: 'assets', key: 'a/b.png' }, 'DELETE', '/storage/objects', { bucket: 'assets', key: 'a/b.png' }],
+      ['nexode_topup_checkout', { amount_usd: 25, upgrade: { kind: 'compute', id, package: 'pro' } }, 'POST', '/billing/topup-checkout', { amount_usd: 25, upgrade: { kind: 'compute', id, package: 'pro' } }],
+      ['nexode_auto_topup', { enabled: false, max_per_month: 2 }, 'PUT', '/billing/auto-topup', { enabled: false, max_per_month: 2 }],
+      ['nexode_subscription_preview', { id, plan_slug: 'nexode-pro' }, 'POST', `/subscriptions/${id}/preview`, { plan_slug: 'nexode-pro', billing_cycle: 'monthly' }],
+      ['nexode_domain_delete_dns', { id, record_id: 'record/a' }, 'DELETE', `/domains/${id}/dns/record%2Fa`],
+      ['nexode_shield_review_finding', { id, fingerprint: 'fp', reviewed: true }, 'PUT', `/shield/scans/${id}/reviewed`, { fingerprint: 'fp', reviewed: true }],
+      ['nexode_shield_export', { id }, 'GET', `/shield/scans/${id}/export?format=sarif`],
+      ['nexode_shield_suppress_finding', { id, fingerprint: 'fp', reason: 'Reviewed false positive' }, 'POST', `/shield/scans/${id}/suppressions`, { fingerprint: 'fp', reason: 'Reviewed false positive' }],
+      ['nexode_github_branches', { owner: 'team', repo: 'a/b' }, 'GET', '/repositories/github/branches?owner=team&repo=a%2Fb'],
+    ];
+    for (const [name, args, method, path, body] of cases) {
+      assert.notEqual((await client.callTool({ name, arguments: args })).isError, true, name);
+      assert.deepEqual(requests.at(-1), { method, path, body }, name);
+    }
+    const before = requests.length;
+    for (const [name, args] of [
+      ['nexode_stack_create', { name: 'Invalid Name', template: 'n8n', variant: 'postgres' }],
+      ['nexode_stack_create', { name: 'valid-name', template: 'n8n' }],
+      ['nexode_compute_set_paused', { id, paused: 'false' }],
+      ['nexode_storage_create_key', { name: 'x', permission: 'admin' }],
+      ['nexode_topup_checkout', { amount_usd: 1 }],
+      ['nexode_auto_topup', { enabled: true, max_per_month: 21 }],
+      ['nexode_subscription_checkout', { plan_slug: 'nexode-pro', billing_cycle: 'annual' }],
+    ]) assert.equal((await client.callTool({ name, arguments: args })).isError, true, name);
+    assert.equal(requests.length, before);
+    assert.match(client.getInstructions(), /nexode_stack_templates/);
+    assert.doesNotMatch(client.getInstructions(), /Stack creation is currently available in the dashboard/);
+  });
+});

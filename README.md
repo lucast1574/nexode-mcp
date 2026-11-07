@@ -29,11 +29,11 @@ codex plugin marketplace add lucast1574/nexode-mcp
 codex plugin add nexode-mcp@nexode
 ```
 
-The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.24 nexode-mcp`.
+The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.25 nexode-mcp`.
 
 ### Other MCP clients
 
-Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.24 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
+Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.25 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
 
 ## What it can do
 
@@ -58,18 +58,25 @@ For custom domains, configure apex and wildcard DNS when requested using the act
 
 Domains bought through Nexode: use `nexode_domain_register` only for a purchase explicitly requested by the user, return its Stripe checkout URL, and inspect `nexode_domain_get` until `status=active` and `dns_status=ready`. Nexode configures apex and wildcard DNS automatically. Use `nexode_domain_dns` to inspect records, then attach each requested hostname to its intended compute and verify public HTTPS.
 
-## Platform behavior in v0.1.24
+## Platform behavior in v0.1.25
 
 The companion platform is the monorepo `ronnaldrangel/nexode` (backend and frontend). This MCP remains a separate repository and consumes only `/api-v1/sdk/v1` with workspace-scoped API keys.
 
-- Standalone n8n tools and Shield repository registration were removed because their SDK routes no longer exist. n8n is now a Compute stack template; stack creation currently requires the dashboard.
+- Standalone n8n tools and Shield repository registration were removed because their SDK routes no longer exist. n8n is now a Compute stack template; stack create/get/list/delete now use the live backend catalog.
 - Compute creation supports WORKER and PRIVATE, DOCKER images (including registry credentials), Dockerfile/Railpack, root_directory, dockerfile_path, start_command and persistent volumes. Workers have no incoming port; private services have no public URL. PRIVATE is not guaranteed tenant network isolation.
 - Running compute/databases consume credits per second. Monthly plan credits expire; top-ups do not. Read `prepaid_enabled` in credit usage: enabled means 24-hour grace then suspension; disabled retains transitional overage invoices. S3 charging has a separate rollout flag. Never infer activation from a plan name.
 - Web analytics is being retired. Do not automatically add its script. Read/configure tools remain for explicitly requested legacy maintenance.
-- Existing bundles keep backend-defined entitlements. Support ticket submission requires explicit user instruction and an idempotent request_id. Passwords, billing checkout, top-ups and administrator actions remain in the dashboard.
+- Existing bundles keep backend-defined entitlements. Support ticket submission requires explicit user instruction and an idempotent request_id. Checkout/top-ups return URLs for user payment; billing changes require owner and subscriptions:write. Password/session/admin operations stay outside this deployment API.
 
-Update pinned package references to `v0.1.24` and restart the MCP process after the release is available. Running clients do not reload themselves.
+Update pinned package references to `v0.1.25` and restart the MCP process after the release is available. Running clients do not reload themselves.
 
 ## Validation
 
 Run `npm run build` then `npm test`. Protocol tests launch the real stdio server against a local mock API. They check tool schemas, payloads, removed routes, safe errors and release pins; they do not certify production deployment or payments.
+
+
+## Expanded operations in 0.1.25
+
+Requires backend SDK revision `2026-11-07-operations-v1` (read `nexode_capabilities` first). Adds live templates/stacks; full Compute lifecycle/settings/volumes/metrics; S3 buckets, objects and scoped keys; DNS edits/delegation; credit transactions, top-up checkout, auto-recharge and subscription operations; Shield review, suppression, webhook and export workflows; and Git branch discovery. See [operations](skills/nexode-deploy/references/operations.md) for semantics and deliberate account/admin boundaries. A backend update must precede using these routes.
+
+New granular scopes are `storage:write`, `subscriptions:write` and `subscriptions:*`. Existing `*` keys include them; existing read-only keys do not acquire write permissions. Stack creation/deletion needs BOTH compute:write and databases:write.

@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { registerStorageTools } from './storage-tools.js';
+import { registerShieldTools } from './shield-tools.js';
+import { registerOperationsTools } from './operations-tools.js';
 import { readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -37,6 +40,9 @@ server.registerTool('nexode_repositories', {
 }, async ({ provider, organization }) => output(`/repositories/${provider}${organization ? `?${provider === 'github' ? 'org' : 'group'}=${encode(organization)}` : ''}`));
 
 registerPlatformTools(server);
+registerOperationsTools(server);
+registerStorageTools(server);
+registerShieldTools(server);
 
 server.registerTool('nexode_compute_list', { description: 'List web, worker and private compute instances.' }, async () => output('/compute'));
 server.registerTool('nexode_compute_get', { description: 'Get a compute instance and its operational status.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}`));
@@ -181,7 +187,7 @@ server.registerTool('nexode_domain_verify_external', {
   inputSchema: { id },
 }, async ({ id }) => output(`/domains/${id}/verify`, 'POST'));
 
-server.registerTool('nexode_shield_scans', { description: 'List recent Shield security scans.', inputSchema: { limit: z.number().int().min(1).max(200).default(20) } }, async ({ limit }) => output(`/shield/scans?limit=${limit}`));
+server.registerTool('nexode_shield_scans', { description: 'List recent Shield security scans.', inputSchema: { limit: z.number().int().min(1).max(200).default(20), include_archived: z.boolean().optional(), archived_only: z.boolean().optional() } }, async ({ limit, include_archived, archived_only }) => output(`/shield/scans?limit=${limit}${include_archived === undefined ? '' : `&include_archived=${include_archived}`}${archived_only === undefined ? '' : `&archived_only=${archived_only}`}`));
 server.registerTool('nexode_shield_scan_compute', { description: 'Start a Shield scan for a compute instance.', inputSchema: { compute_instance_id: id } }, async ({ compute_instance_id }) => output('/shield/scan-compute', 'POST', { compute_instance_id }));
 
 await server.connect(new StdioServerTransport());
