@@ -436,6 +436,7 @@ test('expanded operations use real SDK routes, encode identifiers and reject inv
       ['nexode_stacks', {}, 'GET', '/stacks'],
       ['nexode_stack_create', { name: 'my-flows', template: 'n8n', variant: 'postgres', package: 'pro' }, 'POST', '/stacks', { name: 'my-flows', template: 'n8n', variant: 'postgres', package: 'pro' }],
       ['nexode_stack_get', { id }, 'GET', `/stacks/${id}`],
+      ['nexode_stack_cancel', { id }, 'POST', `/stacks/${id}/cancel`],
       ['nexode_stack_delete', { id }, 'DELETE', `/stacks/${id}`],
       ['nexode_compute_set_paused', { id, paused: true }, 'PUT', `/compute/${id}/paused`, { paused: true }],
       ['nexode_compute_change_package', { id, package: 'ultra' }, 'PUT', `/compute/${id}/package`, { package: 'ultra' }],

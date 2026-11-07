@@ -4,7 +4,7 @@ Always read nexode_capabilities and current resources first. API-key scopes and 
 
 ## Templates
 
-Use nexode_stack_templates; names, variants, images, database versions and volumes come from the live backend. n8n now installs through this catalog, as do the other offered templates. Use nexode_stack_create with name/template/variant/package. Requires compute:write AND databases:write. Reuse existing installations. A timeout is an uncertain result: call nexode_stacks before retrying. Follow nexode_stack_get and component IDs; verify compute_deploy_status and database_get for each. A stack marked running is not proof of component readiness. Never delete a stack to repair it without explicit authorization for every service and its data.
+Use nexode_stack_templates; names, variants, images, database versions and volumes come from the live backend. n8n now installs through this catalog, as do the other offered templates. Use nexode_stack_create with name/template/variant/package. Requires compute:write AND databases:write. Reuse existing installations. A timeout is an uncertain result: call nexode_stacks before retrying. Follow nexode_stack_get and component IDs; verify compute_deploy_status and database_get for each. With durable-stacks capability, running is published only after database connectivity and compute readiness checks. Jobs recover after backend restarts with the same component IDs. Failed jobs preserve resources; inspect their status and costs. To stop installation, use nexode_stack_cancel and poll until it leaves provisioning. Cancellation does not delete or stop already created resources. Never delete a stack to repair it without explicit authorization for every service and its data.
 
 ## Compute
 
@@ -17,6 +17,12 @@ List/provision S3, manage buckets and browse paginated objects. Upload/download 
 ## Billing
 
 Read plans, live catalog, usage including prepaid_enabled, and transactions. Checkout/top-up tools only return a URL; the user completes payment. Plan changes may charge a saved card: read the preview and require explicit instructions for the plan and cost. Auto-top-up changes recurring-card behavior and requires explicit instructions. These writes require subscriptions:write and owner status. Read-only keys do not gain billing writes. Top-up bonus and limits come from backend usage/catalog; do not hardcode claims.
+
+Legacy partners retain their existing subscription prices and entitlements. Never migrate/cancel/replace their plans as part of maintenance. New customers use the current credit plans. Consumption is recorded in closed-hour batches, split at exact billing-period boundaries; settlement waits for the persisted meter checkpoint. A temporarily unfinalized period is not free usage or proof of an unpaid invoice.
+
+## External database connections
+
+PostgreSQL and MongoDB use the returned public hostname on port 443 with TLS; MongoDB requires authSource=admin. Redis uses rediss:// on 443 with TLS. MySQL is internal-only on 3306. Preserve the actual returned connection URI and certificate validation. Infrastructure support is not proof a particular instance is reachable: test an authenticated SELECT 1 or PING from the intended external client. Do not expose credentials in output.
 
 ## Domains and Shield
 
