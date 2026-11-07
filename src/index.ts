@@ -19,7 +19,7 @@ const encode = (value: string) => encodeURIComponent(value);
 
 server.registerTool('nexode_deployment_requirements', {
   description: 'First step for deploying local application code: get Nexode Dockerfile, host, port and Git preparation requirements. The coding agent then creates/adapts the Dockerfile for the actual stack, tests it, commits and pushes using its local tools before creating or redeploying compute. This tool returns requirements; it does not edit files or push Git itself.',
-  inputSchema: { type: z.enum(['FRONTEND', 'BACKEND']), port: z.number().int().min(1).max(65535).optional() },
+  inputSchema: { type: z.enum(['FRONTEND', 'BACKEND', 'WORKER', 'PRIVATE']), port: z.number().int().min(1).max(65535).optional() },
 }, async ({ type, port }) => ({ content: [{ type: 'text' as const, text: JSON.stringify(deploymentRequirements(type, port)) }] }));
 
 server.registerTool('nexode_me', { description: 'Verify Nexode API-key access, identity and scopes. When this succeeds, operate directly through MCP; no dashboard or Google login is needed.' }, async () => output('/me'));
@@ -38,14 +38,14 @@ server.registerTool('nexode_repositories', {
 
 registerPlatformTools(server);
 
-server.registerTool('nexode_compute_list', { description: 'List deployed frontend and backend compute instances.' }, async () => output('/compute'));
+server.registerTool('nexode_compute_list', { description: 'List web, worker and private compute instances.' }, async () => output('/compute'));
 server.registerTool('nexode_compute_get', { description: 'Get a compute instance and its operational status.', inputSchema: { id } }, async ({ id }) => output(`/compute/${id}`));
 server.registerTool('nexode_compute_analytics', {
   description: 'Get owned frontend/landing web analytics, exact installation script (src and data-site), accepted domains, tracking status and 30-day retention. Requires compute:read. Use the returned script in the real app root/head, never guess its URL or compute ID; install once, adapt to the framework, commit/push and redeploy. No API key belongs in website source. Reading does not enable tracking.',
   inputSchema: { id, days: z.union([z.literal(1), z.literal(7), z.literal(30)]).default(7) },
 }, async ({ id, days }) => output(`/compute/${id}/analytics?days=${days}`));
 server.registerTool('nexode_compute_configure_analytics', {
-  description: 'Enable or pause web analytics for an owned frontend/landing compute (compute:write). Call with enabled=true during an authorized automatic analytics setup, then install the exact script returned by nexode_compute_analytics and redeploy the website. This only changes collection status; it does not edit source or prove events are arriving. Respect explicit opt-outs and preserve paused tracking during unrelated maintenance.',
+  description: 'Enable or pause web analytics for an owned frontend/landing compute (compute:write). Call with enabled=true only during an explicitly requested legacy analytics setup, then install the exact script returned by nexode_compute_analytics and redeploy the website. This only changes collection status; it does not edit source or prove events are arriving. Respect explicit opt-outs and preserve paused tracking during unrelated maintenance.',
   inputSchema: { id, enabled: z.boolean() },
 }, async ({ id, enabled }) => output(`/compute/${id}/analytics`, 'PUT', { enabled }));
 
@@ -54,10 +54,15 @@ server.registerTool('nexode_compute_rename_subdomain', {
   inputSchema: { id, subdomain: z.string().trim().toLowerCase().regex(/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)?$/, 'Pass nombre-del-proyecto, dashboard-nombre-del-proyecto or api-nombre-del-proyecto') },
 }, async ({ id, subdomain }) => output(`/compute/${id}/subdomain`, 'PUT', { subdomain }));
 server.registerTool('nexode_compute_create', {
-  description: 'Deploy a GitHub/GitLab repository into the API key workspace. Use the user-provided project_name for branded default hostnames; no app grouping or app_id exists. Public roles: landing <project>, frontend dashboard-<project>, backend api-<project>, under nexode.app. An explicit subdomain or custom_domain overrides defaults. Prepare/test the Dockerfile and verify the pushed SHA first. Select package for credit plans (default basic); legacy bundles retain their entitlements. Pass the actual container port. connect_storage injects private S3 variables for backends only.',
+  description: 'Deploy a GitHub/GitLab repository or a prebuilt DOCKER image into the API key workspace. WORKER has no incoming port; PRIVATE has no public URL. Private networking is not tenant isolation. Git requires repository_url; DOCKER requires docker_image. Dockerfile and Railpack builds accept root_directory. Preserve persistent volumes. Use the user-provided project_name for branded default hostnames; no app grouping or app_id exists. Public roles: landing <project>, frontend dashboard-<project>, backend api-<project>, under nexode.app. An explicit subdomain or custom_domain overrides defaults. Prepare/test the Dockerfile and verify the pushed SHA first. Select package for credit plans (default basic); legacy bundles retain their entitlements. Pass the actual container port. connect_storage injects private S3 variables for backends only.',
   inputSchema: {
-    name: z.string().min(3).max(50), type: z.enum(['FRONTEND', 'BACKEND']), provider: z.enum(['GITHUB', 'GITLAB']),
-    repository_url: z.string().url(), branch: nonempty.default('main'), project_name: nonempty.optional(), app_role: z.enum(['landing', 'frontend', 'backend']).optional(),
+    name: z.string().min(3).max(50), type: z.enum(['FRONTEND', 'BACKEND', 'WORKER', 'PRIVATE']), provider: z.enum(['GITHUB', 'GITLAB', 'DOCKER']),
+    repository_url: z.string().url().optional(),
+    docker_image: nonempty.max(255).optional(), docker_tag: nonempty.max(128).optional(),
+    registry_username: nonempty.max(255).optional(), registry_password: nonempty.max(4096).optional(),
+    build_type: z.enum(['dockerfile', 'railpack']).optional(), root_directory: z.string().max(200).optional(),
+    dockerfile_path: z.string().max(200).optional(), start_command: z.string().optional(),
+    volumes: z.array(nonempty).optional(), branch: nonempty.default('main'), project_name: nonempty.optional(), app_role: z.enum(['landing', 'frontend', 'backend']).optional(),
     subdomain: z.string().trim().toLowerCase().regex(/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)?$/).optional(),
     custom_domain: z.string().optional(), runtime: z.string().optional(), port: z.number().int().min(1).max(65535).optional(),
     package: z.enum(['basic', 'standard', 'pro', 'ultra']).optional(),
@@ -66,9 +71,22 @@ server.registerTool('nexode_compute_create', {
   },
 }, async (input) => {
   try {
+    if (input.provider === 'DOCKER' ? !input.docker_image : !input.repository_url) {
+      throw new Error(input.provider === 'DOCKER' ? 'docker_image is required for DOCKER.' : 'repository_url is required for Git providers.');
+    }
+    if (input.provider !== 'DOCKER') {
+      const repository = new URL(input.repository_url!);
+      const host = input.provider === 'GITHUB' ? 'github.com' : 'gitlab.com';
+      if (repository.protocol !== 'https:' || repository.hostname !== host || repository.port || repository.username || repository.password) {
+        throw new Error(`Use an HTTPS repository URL on ${host}, without embedded credentials or a custom port.`);
+      }
+    }
+    const isPublic = input.type === 'FRONTEND' || input.type === 'BACKEND';
+    if (!isPublic && (input.subdomain || input.custom_domain || input.app_role)) throw new Error('Workers and private services do not have public domains or app_role.');
+    if (input.type === 'WORKER' && input.port !== undefined) throw new Error('Workers do not accept an incoming port.');
     const { project_name, app_role, ...body } = input;
     const role = app_role || (input.type === 'BACKEND' ? 'backend' : 'frontend');
-    const subdomain = !input.custom_domain && !input.subdomain && project_name
+    const subdomain = isPublic && !input.custom_domain && !input.subdomain && project_name
       ? projectSubdomain({ name: project_name }, role) : input.subdomain;
     return await output('/compute', 'POST', { ...body, ...(subdomain ? { subdomain } : {}), port: deploymentRequirements(input.type, input.port).container_port });
   } catch (error) {
@@ -140,12 +158,6 @@ server.registerTool('nexode_database_delete_field', {
   inputSchema: { id, collection: nonempty, field: nonempty, key: z.record(z.string(), z.any()).optional() },
 }, async ({ id, collection, field, key }) => output(`/databases/${id}/browser/delete-field`, 'POST', { collection, field, key }));
 server.registerTool('nexode_database_delete', { description: 'Delete a database instance and its attached storage. This is irreversible.', inputSchema: { id } }, async ({ id }) => output(`/databases/${id}`, 'DELETE'));
-server.registerTool('nexode_n8n_list', { description: 'List n8n instances.' }, async () => output('/n8n'));
-server.registerTool('nexode_n8n_create', { description: 'Create an n8n instance with an automatic Nexode HTTPS domain and no per-instance CPU or memory cap in the API key workspace. Credit package determines pricing; legacy bundles use included slots. Set both username and password to protect the public endpoint with edge authentication.', inputSchema: { name: nonempty, package: z.enum(['basic', 'standard', 'pro', 'ultra']).optional(), env_content: z.string().optional(), username: z.string().regex(/^[A-Za-z0-9._-]+$/).optional(), password: z.string().min(12).optional() } }, async (input) => {
-  if (Boolean(input.username) !== Boolean(input.password)) return { content: [{ type: 'text' as const, text: 'Set both username and password for edge authentication.' }], isError: true };
-  return output('/n8n', 'POST', input);
-});
-server.registerTool('nexode_n8n_restart', { description: 'Redeploy an n8n instance and wait for it to become ready. Legacy unsafe storage may require a data-preserving migration first; never delete or recreate the instance to bypass that error.', inputSchema: { id } }, async ({ id }) => output(`/n8n/${id}/restart`, 'POST'));
 server.registerTool('nexode_domain_check', { description: 'Check domain availability.', inputSchema: { domain: nonempty } }, async ({ domain }) => output(`/domains/check?domain=${encode(domain)}`));
 server.registerTool('nexode_domains', { description: 'List domains owned in Nexode.' }, async () => output('/domains'));
 server.registerTool('nexode_domain_register', {

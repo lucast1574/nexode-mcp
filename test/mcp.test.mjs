@@ -37,7 +37,8 @@ test('current workspace API exposes packages and collaboration without retired a
     res.setHeader('Content-Type', 'application/json'); res.end('{"data":[]}');
   }, async client => {
     const { tools } = await client.listTools();
-    for (const name of ['nexode_apps', 'nexode_app_create', 'nexode_app_update', 'nexode_app_connect']) assert.ok(!tools.some(t => t.name === name));
+    assert.ok(!tools.some(tool => tool.name.startsWith('nexode_n8n_')));
+    for (const name of ['nexode_apps', 'nexode_app_create', 'nexode_app_update', 'nexode_app_connect', 'nexode_n8n_create', 'nexode_n8n_get', 'nexode_n8n_delete', 'nexode_shield_register_repo']) assert.ok(!tools.some(t => t.name === name));
     const create = tools.find(t => t.name === 'nexode_compute_create').inputSchema;
     assert.ok(!('app_id' in create.properties));
     assert.ok(!create.required.includes('project_name'));
@@ -51,7 +52,6 @@ test('current workspace API exposes packages and collaboration without retired a
       ['nexode_database_change_package', { id, package: 'standard' }, 'PUT', `/databases/${id}/package`, { package: 'standard' }],
       ['nexode_database_update_description', { id, description: '' }, 'PUT', `/databases/${id}/description`, { description: '' }],
       ['nexode_database_restart', { id }, 'POST', `/databases/${id}/restart`],
-      ['nexode_n8n_get', { id }, 'GET', `/n8n/${id}`],
       ['nexode_domain_search', { query: 'my app' }, 'GET', '/domains/search?q=my%20app'],
       ['nexode_domain_add_dns', { id, type: 'MX', name: '', content: 'mail.example.com', ttl: 600, prio: 10 }, 'POST', `/domains/${id}/dns`, { type: 'MX', name: '', content: 'mail.example.com', ttl: 600, prio: 10 }],
       ['nexode_shield_repos', {}, 'GET', '/shield/repos'],
@@ -73,10 +73,9 @@ test('current workspace API exposes packages and collaboration without retired a
       ['nexode_database_metrics', { id, hours: 2 }],
       ['nexode_database_change_package', { id, package: 'ultra' }],
       ['nexode_support_create_ticket', { title: 'Issue', description: 'Please help me', request_id: 'not-a-uuid' }],
-      ['nexode_n8n_create', { name: 'Flows', username: 'user' }],
     ]) assert.equal((await client.callTool({ name, arguments: args })).isError, true);
     assert.equal(requests.length, before);
-    assert.match(client.getInstructions(), /not an invoice cap/);
+    assert.match(client.getInstructions(), /prepaid_enabled/);
     assert.match(client.getInstructions(), /only on explicit user instruction/);
   });
 });
@@ -92,8 +91,6 @@ test('service creation forwards package/version without app lookups or grouping 
     assert.deepEqual(requests[0], { path: '/compute', body: { name: 'Demo backend', type: 'BACKEND', provider: 'GITHUB', repository_url: 'https://github.com/example/app', branch: 'main', package: 'ultra', port: 8080, subdomain: 'api-demo' } });
     await client.callTool({ name: 'nexode_database_create', arguments: { name: 'Demo data', type: 'postgres', version: '17', package: 'standard' } });
     assert.deepEqual(requests[1], { path: '/databases', body: { name: 'Demo data', type: 'postgres', version: '17', package: 'standard' } });
-    await client.callTool({ name: 'nexode_n8n_create', arguments: { name: 'Demo flows', package: 'pro' } });
-    assert.deepEqual(requests[2], { path: '/n8n', body: { name: 'Demo flows', package: 'pro' } });
   });
 });
 
@@ -175,7 +172,7 @@ test('MCP handshake, tools and scoped API errors', async () => {
     assert.ok(client.getInstructions()?.length);
     const { tools } = await client.listTools();
     const names = tools.map(tool => tool.name);
-    for (const name of ['nexode_workspaces', 'nexode_pricing_catalog', 'nexode_credit_usage', 'nexode_database_engines', 'nexode_deployment_requirements', 'nexode_me', 'nexode_github_connect_local', 'nexode_plans', 'nexode_repositories', 'nexode_compute_create', 'nexode_compute_deploy_status', 'nexode_compute_set_env', 'nexode_compute_link_database', 'nexode_storage_get', 'nexode_compute_link_storage', 'nexode_n8n_restart']) {
+    for (const name of ['nexode_workspaces', 'nexode_pricing_catalog', 'nexode_credit_usage', 'nexode_database_engines', 'nexode_deployment_requirements', 'nexode_me', 'nexode_github_connect_local', 'nexode_plans', 'nexode_repositories', 'nexode_compute_create', 'nexode_compute_deploy_status', 'nexode_compute_set_env', 'nexode_compute_link_database', 'nexode_storage_get', 'nexode_compute_link_storage']) {
       assert.ok(names.includes(name), `${name} missing`);
     }
     const result = await client.callTool({ name: 'nexode_me', arguments: {} });
@@ -239,10 +236,10 @@ test('a configured API key operates Nexode without a browser session or login re
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(req.url === '/me' ? { id: 'aaaaaaaaaaaaaaaaaaaaaaaa', scopes: ['*'] } : { data: [] }));
   }, async client => {
-    for (const name of ['nexode_me', 'nexode_workspaces', 'nexode_compute_list', 'nexode_database_list', 'nexode_n8n_list']) {
+    for (const name of ['nexode_me', 'nexode_workspaces', 'nexode_compute_list', 'nexode_database_list']) {
       assert.notEqual((await client.callTool({ name, arguments: {} })).isError, true, name);
     }
-    assert.deepEqual(received.map(req => req.path), ['/me', '/workspace', '/compute', '/databases', '/n8n']);
+    assert.deepEqual(received.map(req => req.path), ['/me', '/workspace', '/compute', '/databases']);
     assert.ok(received.every(req => req.cookie === undefined));
   });
 });
@@ -352,7 +349,7 @@ test('analytics tools return the real installation snippet and toggle without le
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(req.method === 'GET' ? { enabled: false, script: `<script src="https://backend.nexode.app/api-v1/analytics/script.js" data-site="${id}"></script>` } : { enabled: JSON.parse(raw).enabled }));
   }, async client => {
-    assert.match(client.getInstructions(), /include automatic Nexode web analytics setup/);
+    assert.match(client.getInstructions(), /Do not install or enable its script on new deployments/);
     const tools = await client.listTools();
     assert.ok(tools.tools.some(t => t.name === 'nexode_compute_analytics'));
     assert.ok(tools.tools.some(t => t.name === 'nexode_compute_configure_analytics'));
@@ -374,35 +371,44 @@ test('analytics tools return the real installation snippet and toggle without le
     assert.equal(received.length, 5);
     assert.ok(!JSON.stringify(received).includes('nxd_live_'));
     const frontend = data(await client.callTool({ name: 'nexode_deployment_requirements', arguments: { type: 'FRONTEND' } }));
-    assert.match(frontend.web_analytics, /nexode_compute_analytics/);
+    assert.match(frontend.web_analytics, /Web analytics is being retired/);
     const backend = data(await client.callTool({ name: 'nexode_deployment_requirements', arguments: { type: 'BACKEND' } }));
     assert.equal(backend.web_analytics, undefined);
   });
 });
 
 
-test('current platform contract reaches plain MCP clients and respects n8n slot errors', async () => {
+test('current compute providers and private types forward validated payloads', async () => {
   const requests = [];
   await withMcp(async (req, res) => {
     let raw = ''; for await (const chunk of req) raw += chunk;
     requests.push({ path: req.url, body: JSON.parse(raw) });
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ message: 'No available n8n slots' }));
+    res.setHeader('Content-Type', 'application/json'); res.end('{}');
   }, async client => {
-    const { tools } = await client.listTools();
-    const n8n = tools.find(tool => tool.name === 'nexode_n8n_create');
-    for (const field of ['custom_domain', 'cpu', 'memory']) assert.equal(n8n.inputSchema.properties[field], undefined);
-    assert.equal(tools.find(tool => tool.name === 'nexode_app_update'), undefined);
-    const result = await client.callTool({ name: 'nexode_n8n_create', arguments: { name: 'Automation' } });
-    assert.equal(result.isError, true);
-    assert.match(result.content[0].text, /No available n8n slots/);
-    assert.deepEqual(requests, [{ path: '/n8n', body: { name: 'Automation' } }]);
+    const create = args => client.callTool({ name: 'nexode_compute_create', arguments: args });
+    assert.notEqual((await create({ name: 'Worker', type: 'WORKER', provider: 'DOCKER', docker_image: 'example/jobs', docker_tag: '1', project_name: 'Example' })).isError, true);
+    assert.deepEqual(requests[0], { path: '/compute', body: { name: 'Worker', type: 'WORKER', provider: 'DOCKER', docker_image: 'example/jobs', docker_tag: '1', branch: 'main' } });
+    assert.notEqual((await create({ name: 'Internal', type: 'PRIVATE', provider: 'GITHUB', repository_url: 'https://github.com/example/api', build_type: 'railpack', root_directory: 'backend', port: 8080 })).isError, true);
+    assert.equal(requests[1].body.port, 8080);
+    assert.equal(requests[1].body.root_directory, 'backend');
+    assert.equal(requests[1].body.subdomain, undefined);
+    for (const args of [
+      { type: 'BACKEND', provider: 'DOCKER' },
+      { type: 'BACKEND', provider: 'GITHUB' },
+      { type: 'BACKEND', provider: 'GITHUB', repository_url: 'https://example.com/github.com/repo' },
+      { type: 'BACKEND', provider: 'GITHUB', repository_url: 'https://github.com.example.com/repo' },
+      { type: 'BACKEND', provider: 'GITLAB', repository_url: 'https://user:secret@gitlab.com/org/repo' },
+      { type: 'BACKEND', provider: 'GITHUB', repository_url: 'http://github.com/org/repo' },
+      { type: 'WORKER', provider: 'DOCKER', docker_image: 'example/jobs', port: 4000 },
+      { type: 'PRIVATE', provider: 'DOCKER', docker_image: 'example/api', subdomain: 'private' },
+    ]) assert.equal((await create({ name: 'Invalid', ...args })).isError, true);
+    assert.equal(requests.length, 2);
     const instructions = client.getInstructions();
-    assert.match(instructions, /100% discount/);
-    assert.match(instructions, /without per-instance CPU or memory caps/);
-    assert.match(instructions, /Compute custom domains remain supported/);
-    assert.match(instructions, /database connection failure/);
-    assert.doesNotMatch(instructions, /one app per workspace/i);
+    assert.match(instructions, /prepaid_enabled/);
+    assert.match(instructions, /24-hour grace/);
+    assert.match(instructions, /standalone n8n API was removed/);
+    assert.match(instructions, /not guaranteed network isolation/);
+    assert.doesNotMatch(instructions, /usage draws hourly|include automatic Nexode web analytics/);
   });
 });
 

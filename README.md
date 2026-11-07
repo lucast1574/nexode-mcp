@@ -6,7 +6,7 @@ MCP tools and a shared skill for deploying GitHub/GitLab apps to [Nexode](https:
 
 ## Connect
 
-1. Create an API key in [Nexode API Keys](https://cloud.nexode.app/dashboard/api-keys). Full MCP access is selected automatically, including S3, databases, n8n, domains, and Shield. You can optionally customize permissions. Copy the key when it is shown; Nexode stores only its hash.
+1. Create an API key in [Nexode API Keys](https://cloud.nexode.app/dashboard/api-keys). Full MCP access is selected automatically, including S3, databases, domains, and Shield. You can optionally customize permissions. Copy the key when it is shown; Nexode stores only its hash.
 2. Set `NEXODE_API_KEY` in the environment that launches your agent. Keep it out of repositories and chat. On PowerShell for the current terminal: `$secret = Read-Host 'Nexode API key' -AsSecureString; $env:NEXODE_API_KEY = [System.Net.NetworkCredential]::new('', $secret).Password`. On Bash: `read -rs NEXODE_API_KEY && export NEXODE_API_KEY`.
 
 With the MCP installed and `NEXODE_API_KEY` configured, the agent operates directly through the API. It does not need a Nexode dashboard session, Google login, password, cookies, SSH or Dokploy access. Ask it to call `nexode_me` to verify access. Authentication failures identify a missing/invalid key or a missing scope; a browser login is not a fallback. Existing GitHub/GitLab authorization is reused; request provider setup only when a repository operation actually requires it.
@@ -29,11 +29,11 @@ codex plugin marketplace add lucast1574/nexode-mcp
 codex plugin add nexode-mcp@nexode
 ```
 
-The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.23 nexode-mcp`.
+The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.24 nexode-mcp`.
 
 ### Other MCP clients
 
-Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.23 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
+Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.24 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
 
 ## What it can do
 
@@ -44,7 +44,7 @@ Configure a stdio server with command `npx`, arguments `--yes --package=github:l
 - Check identity, subscriptions, credit balances, usage packages and legacy entitlements and connected repositories.
 - Create and inspect frontend/backend compute instances; check deployment status, history and logs; merge environment variables, link Nexode databases without disclosing their URIs, redeploy and attach domains.
 - Provision a private S3 bucket when creating a backend with `connect_storage: true`, or attach S3 to an existing backend with `nexode_compute_link_storage`. Nexode injects `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_FORCE_PATH_STYLE`; the MCP response never contains the secret. Redeploy an existing backend after linking.
-- Create/list databases and n8n; Choose a credit package; legacy bundles retain their available slots. Browse SQL tables, MongoDB documents and Redis keys; edit individual values or delete records and fields with database-specific safeguards.
+- Create/list databases; Choose a credit package; legacy bundles retain their available slots. Browse SQL tables, MongoDB documents and Redis keys; edit individual values or delete records and fields with database-specific safeguards.
 - Add domains purchased elsewhere with `nexode_domain_add_external`, retrieve the exact DNS TXT challenge with `nexode_domain_get`, and verify it with `nexode_domain_verify_external`. The existing DNS provider keeps managing DNS; activation requires matching ownership proof. This does not purchase or transfer the domain.
 - Run and list database backups, verify a restore in a temporary database, or restore a selected copy after confirmation. Inspect deployment history and diagnosis, create password-protected branch/PR previews, and roll back to retained images. Check domains; list and start Shield scans.
 
@@ -58,26 +58,18 @@ For custom domains, configure apex and wildcard DNS when requested using the act
 
 Domains bought through Nexode: use `nexode_domain_register` only for a purchase explicitly requested by the user, return its Stripe checkout URL, and inspect `nexode_domain_get` until `status=active` and `dns_status=ready`. Nexode configures apex and wildcard DNS automatically. Use `nexode_domain_dns` to inspect records, then attach each requested hostname to its intended compute and verify public HTTPS.
 
-## Web analytics
+## Platform behavior in v0.1.24
 
-New frontend/landing deployments include automatic source integration through the deployment workflow. `nexode_compute_analytics` returns the exact public script, accepted domains and private stats (`compute:read`). `nexode_compute_configure_analytics` enables/pauses collection (`compute:write`). The coding agent installs the script once, commits/pushes and redeploys; enabling the collector alone does not install it. Existing sites are integrated when requested, and intentional opt-outs/paused states are preserved during unrelated maintenance. See [the integration workflow](skills/nexode-deploy/references/web-analytics.md).
+The companion platform is the monorepo `ronnaldrangel/nexode` (backend and frontend). This MCP remains a separate repository and consumes only `/api-v1/sdk/v1` with workspace-scoped API keys.
 
-## Platform behavior in v0.1.23
+- Standalone n8n tools and Shield repository registration were removed because their SDK routes no longer exist. n8n is now a Compute stack template; stack creation currently requires the dashboard.
+- Compute creation supports WORKER and PRIVATE, DOCKER images (including registry credentials), Dockerfile/Railpack, root_directory, dockerfile_path, start_command and persistent volumes. Workers have no incoming port; private services have no public URL. PRIVATE is not guaranteed tenant network isolation.
+- Running compute/databases consume credits per second. Monthly plan credits expire; top-ups do not. Read `prepaid_enabled` in credit usage: enabled means 24-hour grace then suspension; disabled retains transitional overage invoices. S3 charging has a separate rollout flag. Never infer activation from a plan name.
+- Web analytics is being retired. Do not automatically add its script. Read/configure tools remain for explicitly requested legacy maintenance.
+- Existing bundles keep backend-defined entitlements. Support ticket submission requires explicit user instruction and an idempotent request_id. Passwords, billing checkout, top-ups and administrator actions remain in the dashboard.
 
-- n8n always uses an automatically generated Nexode HTTPS domain. Custom domains are not supported for n8n. n8n runs without per-instance CPU or memory caps; credit packages set its usage price and legacy bundle slots still apply.
-- Active plan entitlements are determined by the backend, including subscriptions using coupons or a 100% discount. Catalog prices must not be treated as amounts paid or admin MRR. Admin revenue statistics are not exposed through customer MCP tools.
-- Compute custom domains remain supported. Runtime checks use the active domain and configured health path. Build success and application readiness are separate; database connection failures require dependency diagnosis.
-- These rules are delivered in the MCP initialization instructions as well as the plugin skill. Existing clients pinned to an older tag must update their package reference to `v0.1.23` and restart the MCP process; running sessions do not reload themselves.
+Update pinned package references to `v0.1.24` and restart the MCP process after the release is available. Running clients do not reload themselves.
 
-Version 0.1.23 also documents the n8n telemetry/edge-auth conflict and persistent node home. A legacy-storage restart error requires data-preserving platform maintenance; deleting or recreating the instance is not a workaround.
+## Validation
 
-
-## Workspace and credit-plan API
-
-Services live directly in the active API-key workspace. The removed My Apps registry and tools nexode_apps/app_create/app_update/app_connect are no longer used. Creation no longer requires app_id. nexode_workspaces reads /workspace without switching a bound key.
-
-Read nexode_pricing_catalog and nexode_credit_usage before provisioning. Hobby/Pro/Team grant monthly credits; hourly usage consumes them. Excess is billed at period end, credits never roll over, and the provisioning threshold is not an invoice cap. Legacy bundles retain their entitlements; shadow usage is a reference estimate. Choose package on compute/database/n8n creation; select database versions from nexode_database_engines.
-
-New tools cover database get/restart/metrics/package/description, compute and n8n deletion, domain search and DNS creation, the full Shield SDK scan workflow, shared support tickets and notifications. Resource reads omit credentials. Support submission requires an explicit request to contact support and a request_id UUID reused on retries.
-
-The companion platform SDK revision adds /billing/pricing, /billing/usage, /workspace, /databases/engines, database metrics/package/description, /support/tickets and /notifications. Deploy that backend revision before using these endpoints. Billing reads require subscriptions:read; collaboration uses support:read/write and notifications:read/write. Account/session changes, billing checkout and administrator operations stay in the dashboard. A missing endpoint is not a reason to ask for browser login.
+Run `npm run build` then `npm test`. Protocol tests launch the real stdio server against a local mock API. They check tool schemas, payloads, removed routes, safe errors and release pins; they do not certify production deployment or payments.
