@@ -29,11 +29,11 @@ codex plugin marketplace add lucast1574/nexode-mcp
 codex plugin add nexode-mcp@nexode
 ```
 
-The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.32 nexode-mcp`.
+The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.33 nexode-mcp`.
 
 ### Other MCP clients
 
-Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.32 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
+Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.33 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
 
 ## What it can do
 
@@ -58,7 +58,7 @@ For custom domains, configure apex and wildcard DNS when requested using the act
 
 Domains bought through Nexode: use `nexode_domain_register` only for a purchase explicitly requested by the user, return its Stripe checkout URL, and inspect `nexode_domain_get` until `status=active` and `dns_status=ready`. Nexode configures apex and wildcard DNS automatically. Use `nexode_domain_dns` to inspect records, then attach each requested hostname to its intended compute and verify public HTTPS.
 
-## Platform behavior in v0.1.32
+## Platform behavior in v0.1.33
 
 The companion platform is the monorepo `ronnaldrangel/nexode` (backend and frontend). This MCP remains a separate repository and consumes only `/api-v1/sdk/v1` with workspace-scoped API keys.
 
@@ -68,20 +68,20 @@ The companion platform is the monorepo `ronnaldrangel/nexode` (backend and front
 - Nexode web analytics has been removed, including its read/configure tools. Do not add its tracking script.
 - Existing bundles keep backend-defined entitlements. Support ticket submission requires explicit user instruction and an idempotent request_id. Checkout/top-ups return URLs for user payment; billing changes require owner and subscriptions:write. Password/session/admin operations stay outside this deployment API.
 
-Update pinned package references to `v0.1.32` and restart the MCP process after the release is available. Running clients do not reload themselves.
+Update pinned package references to `v0.1.33` and restart the MCP process after the release is available. Running clients do not reload themselves.
 
 ## Validation
 
 Run `npm run build` then `npm test`. Protocol tests launch the real stdio server against a local mock API. They check tool schemas, payloads, removed routes, safe errors and release pins; they do not certify production deployment or payments.
 
 
-## Expanded operations in 0.1.32
+## Expanded operations in 0.1.33
 
 Requires backend SDK revision `2026-11-07-operations-v1` (read `nexode_capabilities` first). Adds live templates/stacks; full Compute lifecycle/settings/volumes/metrics; S3 buckets, objects and scoped keys; DNS edits/delegation; credit transactions, top-up checkout, auto-recharge and subscription operations; Shield review, suppression, webhook and export workflows; and Git branch discovery. See [operations](skills/nexode-deploy/references/operations.md) for semantics and deliberate account/admin boundaries. A backend update must precede using these routes.
 
 New granular scopes are `storage:write`, `subscriptions:write` and `subscriptions:*`. Existing `*` keys include them; existing read-only keys do not acquire write permissions. Stack creation/deletion needs BOTH compute:write and databases:write.
 
-## Reliability and compatibility in 0.1.32
+## Reliability and compatibility in 0.1.33
 
 Adds `nexode_stack_cancel` (140 tools total). Requires `stack-cancellation` and `durable-stacks` capabilities for the updated installation lifecycle. Installation inputs and resource IDs survive worker restarts. Failed/cancelled stacks preserve data and may retain running/billed resources; deletion is a separate authorized action. Legacy partners keep their existing subscription prices and entitlements. New credit-plan metering serializes workers and gates period settlement on persisted usage. PostgreSQL/MongoDB/Redis expose TLS endpoints on 443; MySQL remains internal-only.
 
@@ -89,7 +89,7 @@ Adds `nexode_stack_cancel` (140 tools total). Requires `stack-cancellation` and 
 
 `nexode_compute_storage` returns measured usage and `storage_billable`. Compute disk has no separate charge; packages bill reserved CPU/RAM by running time. Database storage-only mode charges actual stored bytes at $4/GB/month without a base instance fee. Existing partner contracts stay unchanged. S3 pricing and legacy included allowances stay unchanged. The resize tool is compatible and does not purchase capacity; initial folder attachment requires pause. Deleting storage is permanent and requires service-name confirmation.
 
-## Monthly invoices in 0.1.32
+## Monthly invoices in 0.1.33
 
 Requires backend SDK revision `2026-11-09-monthly-invoice-v3`. Read `billing_mode` from credit usage. Monthly-invoice mode retains unused credits and charges excess on the same renewal invoice. Top-ups are optional; automatic top-ups are disabled. Cancellation with uncovered usage may generate one final invoice. Compute package prices remain $4/$7/$14/$28. Resource-creation cost estimates must explain shared plan balance and possible next-invoice excess.
 
