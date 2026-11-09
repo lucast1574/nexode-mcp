@@ -359,11 +359,12 @@ test('current compute providers and private types forward validated payloads', a
     const create = args => client.callTool({ name: 'nexode_compute_create', arguments: args });
     assert.notEqual((await create({ name: 'Worker', type: 'WORKER', provider: 'DOCKER', docker_image: 'example/jobs', docker_tag: '1', project_name: 'Example' })).isError, true);
     assert.deepEqual(requests[0], { path: '/compute', body: { name: 'Worker', type: 'WORKER', provider: 'DOCKER', docker_image: 'example/jobs', docker_tag: '1', branch: 'main' } });
-    assert.notEqual((await create({ name: 'Internal', type: 'PRIVATE', provider: 'GITHUB', repository_url: 'https://github.com/example/api', build_type: 'railpack', root_directory: 'backend', port: 8080 })).isError, true);
+    assert.notEqual((await create({ name: 'Internal', type: 'PRIVATE', provider: 'GITHUB', repository_url: 'https://github.com/example/api', build_type: 'dockerfile', root_directory: 'backend', port: 8080 })).isError, true);
     assert.equal(requests[1].body.port, 8080);
     assert.equal(requests[1].body.root_directory, 'backend');
     assert.equal(requests[1].body.subdomain, undefined);
     for (const args of [
+      { type: 'BACKEND', provider: 'GITHUB', repository_url: 'https://github.com/example/api', build_type: 'railpack' },
       { type: 'BACKEND', provider: 'DOCKER' },
       { type: 'BACKEND', provider: 'GITHUB' },
       { type: 'BACKEND', provider: 'GITHUB', repository_url: 'https://example.com/github.com/repo' },
@@ -376,7 +377,9 @@ test('current compute providers and private types forward validated payloads', a
     assert.equal(requests.length, 2);
     const instructions = client.getInstructions();
     assert.match(instructions, /prepaid_enabled/);
-    assert.match(instructions, /24-hour grace/);
+    assert.match(instructions, /billing_mode=monthly_invoice/);
+    assert.match(instructions, /credits.*carry over/);
+    assert.match(instructions, /SAME next monthly renewal invoice/);
     assert.match(instructions, /standalone n8n API was removed/);
     assert.match(instructions, /not guaranteed network isolation/);
     assert.doesNotMatch(instructions, /usage draws hourly|include automatic Nexode web analytics/);
@@ -411,7 +414,7 @@ test('expanded operations use real SDK routes, encode identifiers and reject inv
       ['nexode_stack_delete', { id }, 'DELETE', `/stacks/${id}`],
       ['nexode_compute_set_paused', { id, paused: true }, 'PUT', `/compute/${id}/paused`, { paused: true }],
       ['nexode_compute_change_package', { id, package: 'ultra' }, 'PUT', `/compute/${id}/package`, { package: 'ultra' }],
-      ['nexode_compute_update_build', { id, build_type: 'railpack', root_directory: 'backend' }, 'PUT', `/compute/${id}/build`, { build_type: 'railpack', root_directory: 'backend' }],
+      ['nexode_compute_update_build', { id, build_type: 'dockerfile', root_directory: 'backend' }, 'PUT', `/compute/${id}/build`, { build_type: 'dockerfile', root_directory: 'backend' }],
       ['nexode_compute_update_image', { id, docker_image: 'nginx', docker_tag: 'stable' }, 'PUT', `/compute/${id}/image`, { docker_image: 'nginx', docker_tag: 'stable' }],
       ['nexode_compute_add_volume', { id, mount_path: '/data' }, 'POST', `/compute/${id}/volumes`, { mount_path: '/data' }],
       ['nexode_compute_remove_volume', { id, mount_path: '/data' }, 'DELETE', `/compute/${id}/volumes`, { mount_path: '/data' }],

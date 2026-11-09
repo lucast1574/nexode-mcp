@@ -15,7 +15,7 @@ export function registerPlatformTools(server: McpServer) {
     description: 'Read current compute and database packages, CPU/RAM and usage prices (subscriptions:read). Catalog prices are not paid invoices. Read before provisioning; no fixed app quota on credit plans.',
   }, async () => output('/billing/pricing'));
   server.registerTool('nexode_credit_usage', {
-    description: 'Read credit balance, prepaid_enabled, wallet, grace deadline, usage by resource and projection for the active workspace (subscriptions:read). shadow=true is a reference estimate for legacy plans. Use prepaid_enabled to distinguish enforced prepaid balance from transitional end-of-period overage invoicing.',
+    description: 'Read billing_mode, credit balance, rollover_usd, overage_usd and resource usage (subscriptions:read). monthly_invoice means unused credits carry over and excess goes on the next renewal invoice, without empty-balance suspension or mandatory top-ups. shadow=true is only a legacy reference estimate. prepaid_enabled remains a compatibility field.',
   }, async () => output('/billing/usage'));
 
   server.registerTool('nexode_database_engines', { description: 'Read supported database engines and selectable versions (databases:read). Use the returned versions instead of guessing image tags.' }, async () => output('/databases/engines'));
