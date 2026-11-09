@@ -1,3 +1,3 @@
-# Legacy web analytics
+# Retired web analytics
 
-Web analytics is being retired. Do not install or enable the script for new deployments. Existing read/configure tools remain for explicitly requested legacy maintenance. Preserve existing scripts until removal is authorized. Never claim visits were verified from an enabled flag alone.
+Nexode web analytics, its collector, and the read/configure MCP tools have been removed. Do not install the old script or call the retired endpoints. CPU and memory metrics and the independent Umami stack remain available.
