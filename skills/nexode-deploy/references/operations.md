@@ -8,7 +8,7 @@ Use nexode_stack_templates; names, variants, images, database versions and volum
 
 ## Compute
 
-GitHub/GitLab deployments use a pushed repository and Dockerfile or Railpack settings; monorepos require the correct root_directory and build context. Docker images require docker_image and a real tag; search/list Docker Hub tags when appropriate. WORKER does not listen publicly; PRIVATE has no public URL but is not guaranteed tenant network isolation. Configure pause/resume, package, build/image, port, auto-deploy, volume mounts and domains through the named tools. Changes can restart services; preserve state and verify readiness. Metrics are real samples, not fabricated values. Use database/storage links to keep credentials server-side. Rotating a database password requires relinking consumers and redeploying them.
+GitHub/GitLab deployments use a pushed repository and Dockerfile settings; monorepos require the correct root_directory and build context. Docker images require docker_image and a real tag; search/list Docker Hub tags when appropriate. WORKER does not listen publicly; PRIVATE has no public URL but is not guaranteed tenant network isolation. Configure pause/resume, package, build/image, port, auto-deploy, volume mounts and domains through the named tools. Changes can restart services; preserve state and verify readiness. Metrics are real samples, not fabricated values. Use database/storage links to keep credentials server-side. Rotating a database password requires relinking consumers and redeploying them.
 
 ## Storage
 
