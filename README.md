@@ -29,11 +29,11 @@ codex plugin marketplace add lucast1574/nexode-mcp
 codex plugin add nexode-mcp@nexode
 ```
 
-The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.31 nexode-mcp`.
+The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.32 nexode-mcp`.
 
 ### Other MCP clients
 
-Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.31 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
+Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.32 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
 
 ## What it can do
 
@@ -58,37 +58,41 @@ For custom domains, configure apex and wildcard DNS when requested using the act
 
 Domains bought through Nexode: use `nexode_domain_register` only for a purchase explicitly requested by the user, return its Stripe checkout URL, and inspect `nexode_domain_get` until `status=active` and `dns_status=ready`. Nexode configures apex and wildcard DNS automatically. Use `nexode_domain_dns` to inspect records, then attach each requested hostname to its intended compute and verify public HTTPS.
 
-## Platform behavior in v0.1.31
+## Platform behavior in v0.1.32
 
 The companion platform is the monorepo `ronnaldrangel/nexode` (backend and frontend). This MCP remains a separate repository and consumes only `/api-v1/sdk/v1` with workspace-scoped API keys.
 
 - Standalone n8n tools and Shield repository registration were removed because their SDK routes no longer exist. n8n is now a Compute stack template; stack create/get/list/delete now use the live backend catalog.
 - Compute creation supports WORKER and PRIVATE, DOCKER images (including registry credentials), Dockerfile, root_directory, dockerfile_path, start_command and persistent volumes. Workers have no incoming port; private services have no public URL. PRIVATE is not guaranteed tenant network isolation.
-- Only Hobby, Pro and Team credit plans are sold. Read plans, subscriptions, pricing_catalog and credit_usage before provisioning. In billing_mode=monthly_invoice, unused plan credits and optional top-ups carry over; excess usage goes on the SAME next monthly renewal invoice without suspension for empty balance or mandatory top-ups. Compute bills reserved CPU/RAM by running time, not CPU percent, and has no separate disk charge. Packages remain $4/$7/$14/$28 per full period. Database disk beyond its existing allowance costs $4/GB/month prorated by bytes and time. S3 keeps its current tariff and legacy included conditions. No automatic top-ups run in monthly-invoice mode; requests to enable them are rejected. Creating or resizing still requires an eligible subscription and respects the workspace safety limit. Other billing modes retain the compatibility prepaid_enabled field: inspect it rather than assuming monthly invoicing. Top-up/plan checkout returns a URL for user-completed payment; never claim paid from the URL. Subscription changes/cancellation require explicit instructions, owner authorization and subscriptions:write; inspect cost previews. Unpaid invoices/disputes retain separate protections. Legacy partners keep existing prices, entitlements and coupons; never migrate them during maintenance.
+- Only Hobby, Pro and Team credit plans are sold. Read plans, subscriptions, pricing_catalog and credit_usage before provisioning. In billing_mode=monthly_invoice, unused plan credits and optional top-ups carry over; excess usage goes on the SAME next monthly renewal invoice without suspension for empty balance or mandatory top-ups. Compute bills reserved CPU/RAM by running time, not CPU percent, and has no separate disk charge. Packages remain $4/$7/$14/$28 per full period. In the storage-only model, databases have no base instance fee: actual stored data/index bytes cost $4/GB/month from the first byte, prorated by time. Engine resources are included within available profiles. Manual database backups are shared per workspace subscription cycle: Hobby 3, Pro 7, Team 14; unused backup slots do not carry over. Never create a backup without a user request. Read backup mode/quota before running; preserve request_id on retries. S3 backup workflows are not included. S3 keeps its current tariff and legacy included conditions. No automatic top-ups run in monthly-invoice mode; requests to enable them are rejected. Creating or resizing still requires an eligible subscription and respects the workspace safety limit. Other billing modes retain the compatibility prepaid_enabled field: inspect it rather than assuming monthly invoicing. Top-up/plan checkout returns a URL for user-completed payment; never claim paid from the URL. Subscription changes/cancellation require explicit instructions, owner authorization and subscriptions:write; inspect cost previews. Unpaid invoices/disputes retain separate protections. Legacy partners keep existing prices, entitlements and coupons; never migrate them during maintenance.
 - Nexode web analytics has been removed, including its read/configure tools. Do not add its tracking script.
 - Existing bundles keep backend-defined entitlements. Support ticket submission requires explicit user instruction and an idempotent request_id. Checkout/top-ups return URLs for user payment; billing changes require owner and subscriptions:write. Password/session/admin operations stay outside this deployment API.
 
-Update pinned package references to `v0.1.31` and restart the MCP process after the release is available. Running clients do not reload themselves.
+Update pinned package references to `v0.1.32` and restart the MCP process after the release is available. Running clients do not reload themselves.
 
 ## Validation
 
 Run `npm run build` then `npm test`. Protocol tests launch the real stdio server against a local mock API. They check tool schemas, payloads, removed routes, safe errors and release pins; they do not certify production deployment or payments.
 
 
-## Expanded operations in 0.1.31
+## Expanded operations in 0.1.32
 
 Requires backend SDK revision `2026-11-07-operations-v1` (read `nexode_capabilities` first). Adds live templates/stacks; full Compute lifecycle/settings/volumes/metrics; S3 buckets, objects and scoped keys; DNS edits/delegation; credit transactions, top-up checkout, auto-recharge and subscription operations; Shield review, suppression, webhook and export workflows; and Git branch discovery. See [operations](skills/nexode-deploy/references/operations.md) for semantics and deliberate account/admin boundaries. A backend update must precede using these routes.
 
 New granular scopes are `storage:write`, `subscriptions:write` and `subscriptions:*`. Existing `*` keys include them; existing read-only keys do not acquire write permissions. Stack creation/deletion needs BOTH compute:write and databases:write.
 
-## Reliability and compatibility in 0.1.31
+## Reliability and compatibility in 0.1.32
 
 Adds `nexode_stack_cancel` (140 tools total). Requires `stack-cancellation` and `durable-stacks` capabilities for the updated installation lifecycle. Installation inputs and resource IDs survive worker restarts. Failed/cancelled stacks preserve data and may retain running/billed resources; deletion is a separate authorized action. Legacy partners keep their existing subscription prices and entitlements. New credit-plan metering serializes workers and gates period settlement on persisted usage. PostgreSQL/MongoDB/Redis expose TLS endpoints on 443; MySQL remains internal-only.
 
 ## Managed persistent storage
 
-`nexode_compute_storage` returns measured usage and `storage_billable`. Compute disk has no separate charge; packages bill reserved CPU/RAM by running time. Database disk keeps existing included bytes and charges only actual excess at $4/GB/month prorated by time. S3 pricing and legacy included allowances stay unchanged. The resize tool is compatible and does not purchase capacity; initial folder attachment requires pause. Deleting storage is permanent and requires service-name confirmation.
+`nexode_compute_storage` returns measured usage and `storage_billable`. Compute disk has no separate charge; packages bill reserved CPU/RAM by running time. Database storage-only mode charges actual stored bytes at $4/GB/month without a base instance fee. Existing partner contracts stay unchanged. S3 pricing and legacy included allowances stay unchanged. The resize tool is compatible and does not purchase capacity; initial folder attachment requires pause. Deleting storage is permanent and requires service-name confirmation.
 
-## Monthly invoices in 0.1.31
+## Monthly invoices in 0.1.32
 
 Requires backend SDK revision `2026-11-09-monthly-invoice-v3`. Read `billing_mode` from credit usage. Monthly-invoice mode retains unused credits and charges excess on the same renewal invoice. Top-ups are optional; automatic top-ups are disabled. Cancellation with uncovered usage may generate one final invoice. Compute package prices remain $4/$7/$14/$28. Resource-creation cost estimates must explain shared plan balance and possible next-invoice excess.
+
+## Storage-only databases and manual backups
+
+Read the deployed catalog and capabilities. SDK revision `2026-11-09-storage-only-v4` adds storage-only database billing and manual backup allowances. DB storage costs $4/GB-month from actual bytes and time, without a base instance fee. S3 stays $0.006/GB-month with precise timed metering; Compute prices do not change. Backups run only on request: Hobby 3, Pro 7, Team 14 per workspace subscription cycle. Read remaining allowance and reuse the request_id on retries. Nexode internal backup copies do not consume the customer storage balance. Redis backups and S3 backup/restore are unavailable.
