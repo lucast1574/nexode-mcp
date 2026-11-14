@@ -458,3 +458,44 @@ test('expanded operations use real SDK routes, encode identifiers and reject inv
     assert.doesNotMatch(client.getInstructions(), /Stack creation is currently available in the dashboard/);
   });
 });
+
+test('sponsored accounts can inspect access and provision without checkout, top-up or a paid role', async () => {
+  const requests = [], expiry = '2027-03-14T20:25:05.670Z';
+  await withMcp(async (req, res) => {
+    let raw = ''; for await (const chunk of req) raw += chunk;
+    requests.push({ method: req.method, path: req.url, body: raw ? JSON.parse(raw) : undefined });
+    res.setHeader('Content-Type', 'application/json');
+    if (req.url === '/subscriptions/sponsorship') return res.end(JSON.stringify({ active: true, lifetime: false, expires_at: expiry, billing_mode: 'sponsored', usage_covered_percent: 100, card_required: false, credit_plan_required: false, topup_required: false }));
+    if (req.url === '/billing/usage') return res.end(JSON.stringify({ billing_mode: 'sponsored', amount_due_usd: 0, used_usd: 0, reference_usage_usd: 9, shadow: true }));
+    if (req.url === '/subscriptions') return res.end(JSON.stringify({ data: [{ service: 'bundle', usable: true, package_selection: true, sponsorship: { active: true, expires_at: expiry }, plan: { features: { sponsorship: true } } }] }));
+    return res.end(JSON.stringify({ _id: 'aaaaaaaaaaaaaaaaaaaaaaaa', status: 'provisioning' }));
+  }, async client => {
+    const access = data(await client.callTool({ name: 'nexode_sponsorship', arguments: {} }));
+    assert.equal(access.active, true); assert.equal(access.card_required, false); assert.equal(access.expires_at, expiry);
+    const usage = data(await client.callTool({ name: 'nexode_credit_usage', arguments: {} }));
+    assert.equal(usage.billing_mode, 'sponsored'); assert.equal(usage.amount_due_usd, 0);
+    const subs = data(await client.callTool({ name: 'nexode_subscriptions', arguments: {} }));
+    assert.equal(subs.data[0].package_selection, true);
+    assert.notEqual((await client.callTool({ name: 'nexode_compute_create', arguments: { name: 'Jam game', type: 'FRONTEND', provider: 'GITHUB', repository_url: 'https://github.com/example/game', package: 'basic', port: 3000 } })).isError, true);
+    assert.notEqual((await client.callTool({ name: 'nexode_database_create', arguments: { name: 'Game scores', type: 'postgres', package: 'basic' } })).isError, true);
+    assert.deepEqual(requests.map(r => r.path), ['/subscriptions/sponsorship', '/billing/usage', '/subscriptions', '/compute', '/databases']);
+    assert.match(client.getInstructions(), /without a paid credit plan, card, top-up/);
+    assert.match(client.getInstructions(), /Do not infer missing access from a free user role/);
+    assert.match(client.getInstructions(), /Sponsorship is workspace-scoped/);
+  });
+});
+
+test('sponsorship tool preserves backend expiry decisions and exact missing scopes', async () => {
+  let allowed = true;
+  await withMcp(async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (allowed) return res.end(JSON.stringify({ active: false, lifetime: false, covered_services: [], usage_covered_percent: 0 }));
+    res.statusCode = 401; return res.end(JSON.stringify({ message: 'API key missing required scope: subscriptions:read' }));
+  }, async client => {
+    assert.equal(data(await client.callTool({ name: 'nexode_sponsorship', arguments: {} })).active, false);
+    allowed = false;
+    const denied = await client.callTool({ name: 'nexode_sponsorship', arguments: {} });
+    assert.equal(denied.isError, true); assert.match(denied.content[0].text, /subscriptions:read/);
+    assert.doesNotMatch(denied.content[0].text, /buy a plan|add a card/i);
+  });
+});

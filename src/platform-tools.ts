@@ -11,11 +11,14 @@ export function registerPlatformTools(server: McpServer) {
   server.registerTool('nexode_workspaces', {
     description: 'Read the active API-key workspace and your role (me:read). The key cannot switch or escape a bound workspace. This does not list unrelated workspaces.',
   }, async () => output('/workspace'));
+  server.registerTool('nexode_sponsorship', {
+    description: 'Read cardless sponsorship coverage in the active API-key workspace (subscriptions:read; cardless-sponsorship capability). active=true grants Compute, databases, S3 and Shield usage covered at 100% until expires_at or permanently when lifetime=true. No paid credit plan, card, top-up or paid renewal is required. Technical limits and key scopes still apply; domain purchases are excluded. Never infer access from user role or price alone.',
+  }, async () => output('/subscriptions/sponsorship'));
   server.registerTool('nexode_pricing_catalog', {
-    description: 'Read current compute and database packages, CPU/RAM and usage prices (subscriptions:read). Catalog prices are not paid invoices. Read before provisioning; no fixed app quota on credit plans.',
+    description: 'Read current compute and database packages, CPU/RAM and usage prices (subscriptions:read). Catalog prices are not paid invoices; active sponsorship covers that usage at 100%. Read before provisioning; no fixed app quota on credit plans.',
   }, async () => output('/billing/pricing'));
   server.registerTool('nexode_credit_usage', {
-    description: 'Read billing_mode, credit balance, rollover_usd, overage_usd and resource usage (subscriptions:read). monthly_invoice means unused credits carry over and excess goes on the next renewal invoice, without empty-balance suspension or mandatory top-ups. shadow=true is only a legacy reference estimate. prepaid_enabled remains a compatibility field.',
+    description: 'Read billing_mode, sponsorship coverage, credit balance, rollover_usd, overage_usd and resource usage (subscriptions:read). monthly_invoice means unused credits carry over and excess goes on the next renewal invoice, without empty-balance suspension or mandatory top-ups. billing_mode=sponsored means usage is covered at 100% with amount_due_usd=0: do not ask for a card, credit plan or top-up. reference_usage_usd and shadow=true are non-chargeable estimates and do not mean missing access. Other shadow usage is a legacy reference estimate. prepaid_enabled remains a compatibility field.',
   }, async () => output('/billing/usage'));
 
   server.registerTool('nexode_database_engines', { description: 'Read supported database engines and selectable versions (databases:read). Use the returned versions instead of guessing image tags.' }, async () => output('/databases/engines'));
@@ -25,7 +28,7 @@ export function registerPlatformTools(server: McpServer) {
     inputSchema: { id, hours: z.union([z.literal(1), z.literal(12), z.literal(24), z.literal(72), z.literal(168), z.literal(336)]).default(24) },
   }, async ({ id, hours }) => output(`/databases/${id}/metrics?hours=${hours}`));
   server.registerTool('nexode_database_change_package', {
-    description: 'Change a credit-plan database package, resource limits and ongoing usage price (databases:write). This can restart the service; use within an authorized resize and inspect readiness afterwards.',
+    description: 'Change a credit-plan or actively sponsored database package, resource limits and ongoing usage price (databases:write). This can restart the service; use within an authorized resize and inspect readiness afterwards.',
     inputSchema: { id, package: z.enum(['basic', 'standard']) },
   }, async ({ id, package: pkg }) => output(`/databases/${id}/package`, 'PUT', { package: pkg }));
   server.registerTool('nexode_database_update_description', {
