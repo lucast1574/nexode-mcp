@@ -83,7 +83,7 @@ New granular scopes are `storage:write`, `subscriptions:write` and `subscription
 
 ## Reliability and compatibility in 0.1.35
 
-Adds `nexode_stack_cancel` (141 tools total). Requires `stack-cancellation` and `durable-stacks` capabilities for the updated installation lifecycle. Installation inputs and resource IDs survive worker restarts. Failed/cancelled stacks preserve data and may retain running/billed resources; deletion is a separate authorized action. Legacy partners keep their existing subscription prices and entitlements. New credit-plan metering serializes workers and gates period settlement on persisted usage. PostgreSQL/MongoDB/Redis expose TLS endpoints on 443; MySQL remains internal-only.
+Adds `nexode_stack_cancel` (142 tools total). Requires `stack-cancellation` and `durable-stacks` capabilities for the updated installation lifecycle. Installation inputs and resource IDs survive worker restarts. Failed/cancelled stacks preserve data and may retain running/billed resources; deletion is a separate authorized action. Legacy partners keep their existing subscription prices and entitlements. New credit-plan metering serializes workers and gates period settlement on persisted usage. PostgreSQL/MongoDB/Redis expose TLS endpoints on 443; MySQL remains internal-only.
 
 ## Managed persistent storage
 
@@ -99,4 +99,4 @@ Read the deployed catalog and capabilities. SDK revision `2026-11-09-storage-onl
 
 ## Cardless sponsorships in 0.1.35
 
-SDK capability `cardless-sponsorship` and revision `2026-11-14-sponsorship-v5` add `nexode_sponsorship` (141 tools total). Sponsored workspaces can create and resize normal resource packages without a paid credit plan, card or balance. Coverage includes Compute, databases, S3 and Shield; scopes, workspace membership and technical limits still apply. Domain purchases are excluded. Read the actual expiry or lifetime flag. In `billing_mode=sponsored`, `amount_due_usd=0`; `reference_usage_usd` is an estimate, never debt. Coupon redemption happens directly in the dashboard. Do not initiate checkout, recharge or plan replacement for an active sponsorship. Restart existing MCP clients after updating to this version.
+SDK capability `cardless-sponsorship` and revision `2026-11-14-sponsorship-v5` add `nexode_sponsorship` (142 tools total). Sponsored workspaces can create and resize normal resource packages without a paid credit plan, card or balance. Coverage includes Compute, databases, S3 and Shield; scopes, workspace membership and technical limits still apply. Domain purchases are excluded. Read the actual expiry or lifetime flag. In `billing_mode=sponsored`, `amount_due_usd=0`; `reference_usage_usd` is an estimate, never debt. Coupon redemption happens directly in the dashboard. Do not initiate checkout, recharge or plan replacement for an active sponsorship. Restart existing MCP clients after updating to this version.
