@@ -29,11 +29,11 @@ codex plugin marketplace add lucast1574/nexode-mcp
 codex plugin add nexode-mcp@nexode
 ```
 
-The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.35 nexode-mcp`.
+The API key must be available to the Codex process as `NEXODE_API_KEY`. Restart Codex after installation. To connect only the MCP server without the skill, run `codex mcp add nexode -- npx --yes --package=github:lucast1574/nexode-mcp#v0.1.36 nexode-mcp`.
 
 ### Other MCP clients
 
-Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.35 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
+Configure a stdio server with command `npx`, arguments `--yes --package=github:lucast1574/nexode-mcp#v0.1.36 nexode-mcp`, and environment variable `NEXODE_API_KEY`. The executable writes only MCP JSON-RPC to stdout.
 
 ## What it can do
 
@@ -68,7 +68,7 @@ The companion platform is the monorepo `ronnaldrangel/nexode` (backend and front
 - Nexode web analytics has been removed, including its read/configure tools. Do not add its tracking script.
 - Existing bundles keep backend-defined entitlements. Support ticket submission requires explicit user instruction and an idempotent request_id. Checkout/top-ups return URLs for user payment; billing changes require owner and subscriptions:write. Password/session/admin operations stay outside this deployment API.
 
-Update pinned package references to `v0.1.35` and restart the MCP process after the release is available. Running clients do not reload themselves.
+Update pinned package references to `v0.1.36` and restart the MCP process after the release is available. Running clients do not reload themselves.
 
 ## Validation
 
@@ -100,3 +100,9 @@ Read the deployed catalog and capabilities. SDK revision `2026-11-09-storage-onl
 ## Cardless sponsorships in 0.1.35
 
 SDK capability `cardless-sponsorship` and revision `2026-11-14-sponsorship-v5` add `nexode_sponsorship` (142 tools total). Sponsored workspaces can create and resize normal resource packages without a paid credit plan, card or balance. Coverage includes Compute, databases, S3 and Shield; scopes, workspace membership and technical limits still apply. Domain purchases are excluded. Read the actual expiry or lifetime flag. In `billing_mode=sponsored`, `amount_due_usd=0`; `reference_usage_usd` is an estimate, never debt. Coupon redemption happens directly in the dashboard. Do not initiate checkout, recharge or plan replacement for an active sponsorship. Restart existing MCP clients after updating to this version.
+
+## Deployment follow-through in 0.1.36
+
+The downloaded MCP now instructs its host coding agent to stay with each authorized source deployment until the requested revision is healthy. It must monitor status and correlate deployment IDs/SHAs, inspect build/runtime evidence on failure, make the smallest necessary code or build/startup correction, test, commit/push to the selected repository/branch and monitor again. It must avoid duplicate redeploys when a push already triggered auto-deploy, and verify public HTTPS, the page's versioned assets and rendered UI before reporting success.
+
+The rule is delivered in the MCP initialization instructions, `nexode_deployment_requirements`, the create/status/redeploy tool descriptions and the bundled deployment skill. It applies even to clients that use the MCP without installing the skill. User restrictions, host-client permissions and Git access still apply; missing logs, credentials/access or a failure with no new evidence must be reported as a concrete blocker. The MCP does not itself run an LLM, edit repositories or repair apps after the client session ends. Update to `v0.1.36` and restart the MCP/client to load the new instructions; already running clients retain the previous version. No new API endpoints or resource provisioning are needed. The platform connection-file generator must also point to `v0.1.36` so new downloads receive this version.
