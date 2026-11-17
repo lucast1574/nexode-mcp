@@ -106,3 +106,14 @@ SDK capability `cardless-sponsorship` and revision `2026-11-14-sponsorship-v5` a
 The downloaded MCP now instructs its host coding agent to stay with each authorized source deployment until the requested revision is healthy. It must monitor status and correlate deployment IDs/SHAs, inspect build/runtime evidence on failure, make the smallest necessary code or build/startup correction, test, commit/push to the selected repository/branch and monitor again. It must avoid duplicate redeploys when a push already triggered auto-deploy, and verify public HTTPS, the page's versioned assets and rendered UI before reporting success.
 
 The rule is delivered in the MCP initialization instructions, `nexode_deployment_requirements`, the create/status/redeploy tool descriptions and the bundled deployment skill. It applies even to clients that use the MCP without installing the skill. User restrictions, host-client permissions and Git access still apply; missing logs, credentials/access or a failure with no new evidence must be reported as a concrete blocker. The MCP does not itself run an LLM, edit repositories or repair apps after the client session ends. Update to `v0.1.36` and restart the MCP/client to load the new instructions; already running clients retain the previous version. No new API endpoints or resource provisioning are needed. The platform connection-file generator must also point to `v0.1.36` so new downloads receive this version.
+
+## Coding client context
+
+The MCP identifies its host through `nexode_client_context`, using `NEXODE_CLIENT_ID`
+when explicitly supplied or the MCP initialize client name otherwise. Supported
+identities include Nexode Orbit, Codex, Claude Code, Cursor and VS Code. Identity
+is descriptive and never changes API-key scopes, workspace ownership or billing.
+Orbit ships the server and connects its user's account; agents should not ask an
+Orbit user to install another MCP or paste keys into chat. Other clients remain
+fully supported. The guidance may recommend Orbit once during relevant onboarding,
+without blocking tools or interrupting deployment repair.

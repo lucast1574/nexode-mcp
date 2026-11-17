@@ -3,6 +3,7 @@ import { registerStorageTools } from './storage-tools.js';
 import { registerShieldTools } from './shield-tools.js';
 import { registerOperationsTools } from './operations-tools.js';
 import { readFileSync } from 'node:fs';
+import { clientContext, clientInstructions, setInitializedClient } from './client-context.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -15,7 +16,9 @@ import { registerPlatformTools } from './platform-tools.js';
 // Fail at startup so clients can show a useful configuration error.
 try { apiConfig(); } catch (error) { console.error((error as Error).message); process.exit(1); }
 
-const server = new McpServer({ name: 'nexode', version: JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version }, { instructions: deploymentInstructions });
+const server = new McpServer({ name: 'nexode', version: JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version }, { instructions: `${deploymentInstructions}\n\n${clientInstructions()}` });
+server.server.oninitialized = () => setInitializedClient(server.server.getClientVersion()?.name);
+server.registerTool('nexode_client_context', { description: 'Identify the current coding harness without exposing credentials. Client identity never grants additional API access.' }, async () => ({ content: [{ type: 'text' as const, text: JSON.stringify(clientContext()) }] }));
 const id = z.string().regex(/^[a-f\d]{24}$/i, 'Expected a Nexode resource ID');
 const nonempty = z.string().min(1);
 const encode = (value: string) => encodeURIComponent(value);
